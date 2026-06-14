@@ -164,7 +164,31 @@ integration commit `6627874`.
   many-containers trap F worried about did not reproduce — suites are
   `.serialized`). Final commit `69c6c4d`.
 
-### ALL WAVES COMPLETE — remaining: both-mode Simulator smoke test + wrap-up.
+### ALL WAVES COMPLETE ✅
+
+**Both-mode Simulator smoke test PASSED** (iPhone 17, OS 26):
+- Onboarding renders (persona picker: Restless Local / Newcomer / Weekend Drifter).
+- **Anchor** renders a real ranked pick from the SF catalog ("Painted Ladies /
+  Alamo Square"), weather chip ("Clear · night"), vibe line, open-now badge, and
+  the [Take me there] / [Another] / [I'm here] actions.
+- **Drift** renders the MapKit map + Duration (30 min) + Randomness ("Guided")
+  dials; Home/Drift/Anchor tab bar works.
+- idb tap/describe is broken in this env (Python 3.14 asyncio); navigated via a
+  temporary DEBUG-only `EXPLORE_TAB` env hook + `simctl` onboarding-flag bypass,
+  both reverted/external — committed tree is clean.
+
+**Final state:** branch `explore-drift-anchor`; app builds; full suite **308
+passed / 0 failed**; both modes verified in Simulator.
+
+### Residual (out-of-scope / human / fast-follow)
+- **US-A3:** curate the catalog up to ≥150 hand-tagged POIs (starter = 40 + the
+  `tools/seed_pois.py` Foursquare seeder; needs `FSQ_API_KEY`).
+- **Deploy:** enable the WeatherKit capability on the App ID (else weather falls
+  back to `.clear`); add `NSLocationTemporaryUsageDescriptionDictionary`
+  (`ExploreAccuracy`) for temporary full-accuracy.
+- **Fast-follows:** per-cell globe placement offset (Drift cells can cluster);
+  inject live `ContextAssembler` weather into the Drift session snapshot;
+  AR "reveal on arrival" and new specimen art (explicitly deferred by the PRD).
 
 F: real `LocationVerifier` geofence + one-shot location fix (US-F1); discovery→
 specimen mapping + foggy/clear variant, migration-safe `WorldPropRecord.variant`
