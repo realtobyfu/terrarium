@@ -8,13 +8,11 @@
 //
 //  Shell structure:
 //   Tab 0 — Home (globe)      → HomeView (existing)
-//   Tab 1 — Drift             → DriftPlaceholderView (Stream E will replace)
-//   Tab 2 — Anchor            → AnchorPlaceholderView (Stream D will replace)
+//   Tab 1 — Drift             → DriftView (Stream E)
+//   Tab 2 — Anchor            → AnchorView (Stream D)
 //
 //  The Drift/Anchor view models are created once by the container and held in
-//  `ExploreShellView` state so model state survives tab switches. Streams D and
-//  E will swap the placeholder bodies for the real screens; the view model refs
-//  remain stable.
+//  `ExploreShellView` state so model state survives tab switches.
 //
 //  Design: minimal tab bar matching the existing cream/accent palette.
 //
@@ -74,11 +72,11 @@ struct ExploreShellView: View {
                     // globe / sky state is preserved when switching tabs.
                     .allowsHitTesting(selectedTab == .home)
 
-                DriftPlaceholderView(viewModel: driftVM)
+                DriftView(viewModel: driftVM)
                     .opacity(selectedTab == .drift ? 1 : 0)
                     .allowsHitTesting(selectedTab == .drift)
 
-                AnchorPlaceholderView(viewModel: anchorVM)
+                AnchorView(viewModel: anchorVM)
                     .opacity(selectedTab == .anchor ? 1 : 0)
                     .allowsHitTesting(selectedTab == .anchor)
             }
@@ -145,148 +143,6 @@ private struct TabBarItem: View {
         }
         .buttonStyle(.plain)
         .animation(.spring(response: 0.25), value: isSelected)
-    }
-}
-
-// MARK: - Drift placeholder (Stream E will replace the body)
-
-struct DriftPlaceholderView: View {
-    @State var viewModel: DriftViewModel
-
-    var body: some View {
-        ZStack {
-            // Sky-tinted background
-            LinearGradient(
-                colors: [Color(hex: "B8D4E8"), Color(hex: "E8F4F8")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: Theme.Spacing.xl) {
-                Spacer()
-
-                Image(systemName: "figure.walk.motion")
-                    .font(.system(size: 64))
-                    .foregroundStyle(Theme.Palette.accent)
-
-                VStack(spacing: Theme.Spacing.m) {
-                    Text("Drift")
-                        .font(Theme.Typography.display(32, weight: .medium))
-                        .foregroundStyle(Theme.Palette.title)
-
-                    Text("Start a ramble — your map fills in as you go.")
-                        .font(Theme.Typography.body(16))
-                        .foregroundStyle(Theme.Palette.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Theme.Spacing.xl)
-                }
-
-                // Session state preview
-                if viewModel.session?.isActive == true {
-                    SoftPanel {
-                        HStack(spacing: Theme.Spacing.m) {
-                            Circle()
-                                .fill(.red)
-                                .frame(width: 8, height: 8)
-                            Text("Ramble in progress")
-                                .font(Theme.Typography.body(14, weight: .medium))
-                                .foregroundStyle(Theme.Palette.title)
-                        }
-                        .padding(Theme.Spacing.m)
-                    }
-                    .padding(.horizontal, Theme.Spacing.l)
-
-                    GlowButton(title: "End Ramble") {
-                        viewModel.endRamble()
-                    }
-                    .padding(.horizontal, Theme.Spacing.l)
-                } else {
-                    GlowButton(title: "Start a Ramble") {
-                        viewModel.startRamble()
-                    }
-                    .padding(.horizontal, Theme.Spacing.l)
-                }
-
-                Spacer()
-                // Space for tab bar
-                Spacer().frame(height: 80)
-            }
-        }
-    }
-}
-
-// MARK: - Anchor placeholder (Stream D will replace the body)
-
-struct AnchorPlaceholderView: View {
-    @State var viewModel: AnchorViewModel
-
-    var body: some View {
-        ZStack {
-            // Warm amber background
-            LinearGradient(
-                colors: [Color(hex: "F2E2C4"), Color(hex: "FBF2E0")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: Theme.Spacing.xl) {
-                Spacer()
-
-                Image(systemName: "mappin.circle.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(Theme.Palette.accent)
-
-                VStack(spacing: Theme.Spacing.m) {
-                    Text("Anchor")
-                        .font(Theme.Typography.display(32, weight: .medium))
-                        .foregroundStyle(Theme.Palette.title)
-
-                    Text("No plans? We'll find you one great place to go.")
-                        .font(Theme.Typography.body(16))
-                        .foregroundStyle(Theme.Palette.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Theme.Spacing.xl)
-                }
-
-                // Show current pick if loaded
-                if let pick = viewModel.pick {
-                    SoftPanel(cornerRadius: Theme.Radius.card) {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-                            Text(pick.neighborhood.uppercased())
-                                .font(Theme.Typography.body(11, weight: .medium))
-                                .tracking(1.2)
-                                .foregroundStyle(Theme.Palette.label)
-
-                            Text(pick.name)
-                                .font(Theme.Typography.display(22, weight: .medium))
-                                .foregroundStyle(Theme.Palette.title)
-
-                            Text(pick.vibe.map(\.rawValue).joined(separator: " · "))
-                                .font(Theme.Typography.body(14))
-                                .foregroundStyle(Theme.Palette.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(Theme.Spacing.l)
-                    }
-                    .padding(.horizontal, Theme.Spacing.l)
-                }
-
-                GlowButton(title: viewModel.pick == nil ? "Find My Anchor" : "New suggestion") {
-                    Task { await viewModel.refresh() }
-                }
-                .padding(.horizontal, Theme.Spacing.l)
-
-                Spacer()
-                // Space for tab bar
-                Spacer().frame(height: 80)
-            }
-        }
-        .task {
-            // Pre-load a pick when the view appears
-            await viewModel.refresh()
-        }
     }
 }
 
