@@ -78,7 +78,30 @@ A → B → C → G into `explore-drift-anchor`, then I swap stubs→real in App
 | A Catalog | a17062e463ccd6d1f | iPhone 17 | ✅ MERGED (40 POIs, 17 tests) |
 | B Context | a8d31b2a317b591aa | iPhone 17 Pro | ✅ MERGED (62 tests) |
 | C Ranker | a37163529f1aa12f7 | iPhone 17 Pro Max | ✅ MERGED (27 tests) |
-| G Onboard/Shell | ab5800ea87ca93f1b | iPhone Air | running |
+| G Onboard/Shell | ab5800ea87ca93f1b | iPhone Air | ✅ MERGED (14 tests) |
+
+**Wave 1 COMPLETE** — all of A/B/C/G merged into `explore-drift-anchor`; real
+providers wired via `AppContainer.live()`; full suite green (`** TEST SUCCEEDED **`)
+on iPhone 17. Integration commit `91340b9`.
+- G stalled on its simulator screenshot step *after* tests passed but *before* its
+  own commit; recovered by committing its worktree manually, then merged.
+- Two cross-stream test-compile fixes were needed (passed alone, failed combined):
+  `@Test` display name must be a literal (RulesRecommenderTests interpolated a
+  static const); `Bundle(for: structType.self as AnyClass)` is invalid for a
+  swift-testing `@Suite` struct (BundledPOICatalogTests → use `.main`).
+- `.claude/worktrees/` added to `.gitignore` (don't commit agent worktrees).
+
+### Wave 2 — in progress (parallel, forked from `91340b9`)
+| Stream | Agent ID | Status |
+|---|---|---|
+| D Anchor | (launching) | running |
+| E Drift | (launching) | running |
+
+Wave-2 agents do NOT run simulator screenshots (avoids the G-style stall) and do
+NOT edit `ExploreShellView.swift` — I wire their real views into the shell + run a
+both-mode Simulator smoke test at Wave-2 integration. D owns `AnchorFeature/`, E
+owns `DriftFeature/` + `Domain/GeohashCell.swift` + `Domain/RouteGenerator.swift`
+(+ pbxproj `UIBackgroundModes` for E). They expand the Wave-0 skeleton VMs.
 
 **Stream B integration TODOs (affect Waves 2/3):**
 - `LocationSessionManager.currentCoordinate()` returns **nil while a session is
