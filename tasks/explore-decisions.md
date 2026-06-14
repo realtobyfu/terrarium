@@ -141,6 +141,18 @@ weatherFit boosts, distancePenalty=0.75, persona additive bonuses).
   fully-qualify `WeatherKit.WeatherCondition`). Verify B's build is actually green
   before merging.
 
-### Remaining waves
-- **Wave 2:** D Anchor (needs A,B,C — concierge screen US-D1 + terrarium handoff US-D2), E Drift (needs B+cells — US-E1 session, US-E2 fog/geohash cells, US-E3 route gen). Run as 2 parallel worktree agents off the merged branch. D creates `AnchorView.swift`, E creates `DriftView.swift`; shell placeholders (from G) get swapped to these.
-- **Wave 3 (serial):** F Integration — real `LocationVerifier` geofence (US-F1), discovery→specimen mapping w/ context variants (US-F2), discovery journaling (US-F3); wire D&E discoveries into `WorldStore`; full suite + both-mode Simulator smoke test.
+### Wave 2 COMPLETE
+D + E merged; `ExploreShellView` swapped placeholders → real `AnchorView`/`DriftView`
+(dead placeholder structs removed); app builds + FULL suite green on iPhone 17;
+integration commit `6627874`.
+
+### Wave 3 — in progress (serial, final; forked from `6627874`)
+| Stream | Agent ID | Sim | Status |
+|---|---|---|---|
+| F Integration | a9f2f74bbf1918294 | iPhone 17 Pro | running |
+
+F: real `LocationVerifier` geofence + one-shot location fix (US-F1); discovery→
+specimen mapping + foggy/clear variant, migration-safe `WorldPropRecord.variant`
+default (US-F2); discovery journaling reuse (US-F3); wires D&E awards into
+`WorldStore`. After F merges: full suite + **both-mode Simulator smoke test**
+(deferred to here to avoid a redundant interim run).
