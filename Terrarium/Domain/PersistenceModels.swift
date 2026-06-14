@@ -41,24 +41,31 @@ final class WorldPropRecord {
     var longitude: Float
     var poiRef: String?
     var createdAt: Date
+    /// Specimen appearance variant — e.g. "clear" (default) or "foggy".
+    /// Default "clear" keeps lightweight migration working for existing stores
+    /// (no migration step needed: SwiftData adds columns with defaults).
+    var variant: String = "clear"
 
     init(id: UUID = UUID(),
          kind: WorldProp.Kind,
          coordinate: SIMD2<Float>,
          poiRef: String? = nil,
+         variant: String = "clear",
          createdAt: Date = .now) {
         self.id = id
         self.kindRaw = kind.rawValue
         self.latitude = coordinate.x
         self.longitude = coordinate.y
         self.poiRef = poiRef
+        self.variant = variant
         self.createdAt = createdAt
     }
 
     var kind: WorldProp.Kind { WorldProp.Kind(rawValue: kindRaw) ?? .flowers }
 
     var renderProp: WorldProp {
-        WorldProp(id: id, kind: kind, sphereCoordinate: SIMD2<Float>(latitude, longitude))
+        WorldProp(id: id, kind: kind, sphereCoordinate: SIMD2<Float>(latitude, longitude),
+                  variant: variant)
     }
 }
 

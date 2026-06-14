@@ -172,34 +172,55 @@ final class AnchorViewModel {
     /// once Stream F injects `LocationVerifier`).
     ///
     /// 1. Builds a `Quest` from the current POI.
-    /// 2. Awards it via `WorldStore.complete(quest:with:)` (idempotent).
+    /// 2. Awards it via `WorldStore.complete(quest:with:variant:)` (idempotent).
+    ///    The variant is derived from the context weather snapshot (US-F2).
     /// 3. Records a `Discovery` in the injected `DiscoveryStore`.
+    /// 4. Writes a `JournalEntry` for the specimen using the POI's name (US-F3).
     func arrive() async {
         guard let poi = pick else { return }
         isLoading = true
         defer { isLoading = false }
 
-        // Build quest from POI (FR-16, FR-21)
+        // Snapshot context (weather / time) at arrival time.
+        let ctx = context ?? assembler.assemble(
+            weather: .clear, now: .now, preferences: preferences
+        )
+
+        // Derive the specimen variant from the weather context (US-F2).
+        let specimenVariant = SpecimenMapping.variant(for: ctx.weather)
+
+        // Build quest from POI — use SpecimenMapping.kind so the mapping is
+        // consistent even if the POI's stored specimenKind drifts (FR-21).
+        let mappedKind = SpecimenMapping.kind(for: poi.category)
         let quest = Quest(
             title: "Arrived at \(poi.name)",
             prompt: "You made it to \(poi.name).",
             placeName: poi.name,
             poiRef: poi.poiRef,
-            suggestedKind: poi.specimenKind
+            suggestedKind: mappedKind
         )
 
-        // Award via WorldStore (grows specimen at POI placement coordinate)
+        // Award via WorldStore (grows specimen at POI placement coordinate).
         var specimenGrown = false
         if let store = worldStore {
-            let prop = await store.complete(quest: quest, with: arrivalVerifier)
-            specimenGrown = prop != nil
+            let prop = await store.complete(quest: quest, with: arrivalVerifier,
+                                            variant: specimenVariant)
+            if let prop = prop {
+                specimenGrown = true
+                // US-F3: write a journal entry so tapping the specimen shows
+                // the discovery. Text uses the place name as the seed; the user
+                // can overwrite it from the journal sheet.
+                store.addJournal(
+                    to: prop,
+                    questId: quest.id,
+                    text: "Discovered \(poi.name).",
+                    placeName: poi.name
+                )
+            }
         }
 
         // Record discovery regardless of whether a specimen was awarded
-        // (could be idempotent / already completed)
-        let ctx = context ?? assembler.assemble(
-            weather: .clear, now: .now, preferences: preferences
-        )
+        // (could be idempotent / already completed).
         let discovery = Discovery(
             target: .poi(poiRef: poi.poiRef),
             context: DiscoveryContext(weather: ctx.weather, timeOfDay: ctx.timeOfDay)
