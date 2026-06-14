@@ -115,8 +115,9 @@ struct WorldStoreTests {
             func all() -> [POI] { [poi] }
             func allowedRefs() -> Set<String> { [poi.poiRef] }
         }
-        struct FixedLocationSession: LocationSessionProviding {
+        final class FixedLocationSession: LocationSessionProviding {
             let coord: Coordinate?
+            init(coord: Coordinate?) { self.coord = coord }
             var isActive: Bool { false }
             func start() {}
             func stop() {}

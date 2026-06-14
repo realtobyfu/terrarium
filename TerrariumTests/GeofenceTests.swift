@@ -12,6 +12,7 @@ import Foundation
 @testable import Terrarium
 
 @Suite("Geofence")
+@MainActor
 struct GeofenceTests {
 
     // MARK: - Known coordinates
