@@ -108,6 +108,12 @@ final class AppContainer {
                                  discoveries: discoveryStore,
                                  preferences: preferences)
         vm.worldStore = worldStore
+        // US-F1: inject the real LocationVerifier so Anchor arrival is
+        // geofence-verified (with honor-mode fallback when location is
+        // unavailable). The verifier reads the same catalog and location
+        // session already wired into the VM.
+        vm.arrivalVerifier = LocationVerifier(catalog: poiCatalog,
+                                              location: locationSession)
         return vm
     }
 

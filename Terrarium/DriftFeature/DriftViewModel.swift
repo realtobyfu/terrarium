@@ -272,10 +272,58 @@ final class DriftViewModel {
             )
             discoveries.record(discovery)
 
-            // If this is a brand-new cell (never explored before), it is
-            // `.newThisSession`; if seen on an earlier session it is `.explored`
-            // but we still record so the store stays accurate.
-            _ = state // used by DriftView for rendering distinction
+            // US-F2 / US-F3: grow a specimen for each brand-new cell
+            // (never seen before on any session). Re-explored cells don't grow
+            // a second specimen.
+            if !alreadyExplored, let store = worldStore {
+                growSpecimen(forCell: cellID, context: sessionContext, store: store)
+            }
+
+            // Used by DriftView for rendering distinction.
+            _ = state
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // MARK: Specimen growth (US-F2, US-F3)
+    // -------------------------------------------------------------------------
+
+    /// Grow a specimen for a brand-new Drift cell discovery.
+    ///
+    /// Cell discoveries don't have a POI reference, so we:
+    /// 1. Use `.other` category → `.flowers` kind (the "wandering" specimen).
+    /// 2. Derive the variant from the session context weather.
+    /// 3. Use the cell id as the `poiRef` so `POIPlacement` places it
+    ///    deterministically — the same cell always grows in the same globe spot.
+    /// 4. Write a journal entry (US-F3) with the cell id as the place name so
+    ///    the tap-a-specimen interaction surfaces some discovery text.
+    ///
+    /// The award uses `HonorVerifier` — there's no second location check for
+    /// Drift cells; the breadcrumb itself IS the verification.
+    private func growSpecimen(forCell cellID: String,
+                              context: DiscoveryContext,
+                              store: WorldStore) {
+        let variant = SpecimenMapping.variant(for: context.weather)
+        let kind    = SpecimenMapping.kind(for: .other)  // .flowers
+
+        // Reuse poiRef slot for the cell id so placement is deterministic.
+        let quest = Quest(
+            title:         "Explored \(cellID)",
+            prompt:        "You wandered through a new area.",
+            placeName:     "Cell \(cellID)",
+            poiRef:        cellID,
+            suggestedKind: kind
+        )
+
+        let prop = store.award(quest: quest, verifierKind: .honor, variant: variant)
+        if let prop = prop {
+            // US-F3: seed a discovery journal entry for this cell.
+            store.addJournal(
+                to:        prop,
+                questId:   quest.id,
+                text:      "Wandered into a new area.",
+                placeName: "Drift discovery"
+            )
         }
     }
 

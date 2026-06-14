@@ -98,7 +98,36 @@ struct WorldStoreTests {
         #expect(honored != nil)
         #expect(store.current().props.count == before + 1)
 
-        let denied = await store.complete(quest: quest("poi.b"), with: LocationVerifier())
+        // LocationVerifier with a known-outside coordinate: user is at 0,0
+        // (far from any SF POI), but since the catalog has no poi.b the verifier
+        // degrades to honor-mode and returns true. To get a failing verifier,
+        // use a catalog that contains the POI and a user far away.
+        let sfCoord = Coordinate(latitude: 37.7596, longitude: -122.4269)
+        let testPOI = POI(poiRef: "poi.b", name: "Test", category: .park,
+                          neighborhood: "Mission",
+                          coordinate: sfCoord,
+                          indoorOutdoor: .outdoor, bestTime: [.afternoon],
+                          weatherFit: [.clear], goodFor: [.solo], vibe: [.scenic],
+                          price: .free, hoursRef: nil, specimenKind: .tree, source: .curated)
+
+        struct SinglePOICatalog: POICatalogProviding {
+            let poi: POI
+            func all() -> [POI] { [poi] }
+            func allowedRefs() -> Set<String> { [poi.poiRef] }
+        }
+        struct FixedLocationSession: LocationSessionProviding {
+            let coord: Coordinate?
+            var isActive: Bool { false }
+            func start() {}
+            func stop() {}
+            func breadcrumbStream() -> AsyncStream<Coordinate> { AsyncStream { $0.finish() } }
+            func currentCoordinate() async -> Coordinate? { coord }
+        }
+        // User is at 0°N 0°E — ~11,000 km from Dolores Park, outside the 80 m fence.
+        let farLocation = FixedLocationSession(coord: Coordinate(latitude: 0, longitude: 0))
+        let verifier = LocationVerifier(catalog: SinglePOICatalog(poi: testPOI),
+                                        location: farLocation)
+        let denied = await store.complete(quest: quest("poi.b"), with: verifier)
         #expect(denied == nil)
         #expect(store.current().props.count == before + 1)
     }

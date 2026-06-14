@@ -41,16 +41,30 @@ final class WorldStore: WorldStateProviding {
 
     /// Verify and, on success, grow the world by one specimen and raise
     /// vitality. Idempotent: a quest already completed is a no-op (returns nil).
+    ///
+    /// - Parameters:
+    ///   - quest:    The quest being verified.
+    ///   - verifier: Determines whether the quest counts as completed.
+    ///   - variant:  Specimen appearance variant ("clear" or "foggy"). Defaults
+    ///               to "clear" so existing callers keep compiling.
     @discardableResult
-    func complete(quest: Quest, with verifier: QuestVerifier) async -> WorldPropRecord? {
+    func complete(quest: Quest, with verifier: QuestVerifier,
+                  variant: String = "clear") async -> WorldPropRecord? {
         guard await verifier.verify(quest) else { return nil }
-        return award(quest: quest, verifierKind: verifier.kind)
+        return award(quest: quest, verifierKind: verifier.kind, variant: variant)
     }
 
     /// The synchronous award step, separated so it is directly unit-testable
     /// and so the idempotency check is atomic.
+    ///
+    /// - Parameters:
+    ///   - quest:        The quest being awarded.
+    ///   - verifierKind: How verification was performed (stored for analytics).
+    ///   - variant:      Appearance variant key (US-F2): "clear" or "foggy".
+    ///                   Defaults to "clear" so existing callers keep compiling.
     @discardableResult
-    func award(quest: Quest, verifierKind: VerifierKind) -> WorldPropRecord? {
+    func award(quest: Quest, verifierKind: VerifierKind,
+               variant: String = "clear") -> WorldPropRecord? {
         guard let world = try? fetchRecord() else { return nil }
         if alreadyCompleted(quest.id) { return nil }
 
@@ -59,7 +73,8 @@ final class WorldStore: WorldStateProviding {
         let prop = WorldPropRecord(
             kind: quest.suggestedKind,
             coordinate: POIPlacement.sphereCoordinate(forPOIRef: quest.poiRef),
-            poiRef: quest.poiRef
+            poiRef: quest.poiRef,
+            variant: variant
         )
         context.insert(prop)
         world.vitality = min(1, world.vitality + completionVitality)

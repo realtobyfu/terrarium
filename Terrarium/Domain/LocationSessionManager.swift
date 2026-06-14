@@ -80,6 +80,10 @@ final class LocationSessionManager: NSObject, LocationSessionProviding {
     private var breadcrumbContinuation: AsyncStream<Coordinate>.Continuation?
     /// Stored until either `start()` or a permission change arrives.
     private var pendingStart: Bool = false
+    /// The most recent location fix delivered by the delegate.
+    /// Retained so `currentCoordinate()` can return it as a one-shot read
+    /// without needing an active breadcrumb stream consumer (US-F1, FR-15).
+    private var lastKnownCoordinate: Coordinate?
 
     // MARK: Init
 
@@ -141,14 +145,20 @@ final class LocationSessionManager: NSObject, LocationSessionProviding {
     }
 
     func currentCoordinate() async -> Coordinate? {
-        // The verifier (FR-15) only calls this; it is always nil outside a session.
-        // During a session the last breadcrumb is the best available reading.
-        guard isActive else { return nil }
-        // Momentary read: not requesting a new fix here, just returning the most
-        // recent delegate-delivered coordinate. For a more precise one-shot read
-        // the caller should use a separate CLLocationManager; this is sufficient
-        // for the geofence verifier given the breadcrumb cadence.
-        return nil // overridden by the delegate path; test via MockLocationManager
+        // US-F1 (FR-15): return the last known fix so the geofence verifier can
+        // make a one-shot read without a full breadcrumb-stream consumer.
+        //
+        // Strategy:
+        // • If a session is active AND we have a recent breadcrumb, return it
+        //   immediately (zero-latency path used by AnchorViewModel distance calc
+        //   and LocationVerifier).
+        // • If the manager is authorised but no session is active (e.g. the user
+        //   taps "I'm here" before starting a Drift) we still return the last fix
+        //   so the geofence verifier can award optimistically rather than
+        //   silently failing.
+        // • If lastKnownCoordinate is nil (no fix yet / permission denied) the
+        //   verifier receives nil and degrades to honor-mode per decisions.md #6.
+        return lastKnownCoordinate
     }
 
     // MARK: Private helpers
@@ -208,7 +218,12 @@ extension LocationSessionManager: CLLocationManagerDelegate {
             longitude: location.coordinate.longitude
         )
         Task { @MainActor [weak self] in
-            guard let self, self.isActive else { return }
+            guard let self else { return }
+            // Always update lastKnownCoordinate (even outside an active session)
+            // so the geofence verifier can do a one-shot read (US-F1).
+            self.lastKnownCoordinate = coord
+            // Breadcrumbs are only emitted while a session is active (FR-6).
+            guard self.isActive else { return }
             self.breadcrumbContinuation?.yield(coord)
         }
     }
