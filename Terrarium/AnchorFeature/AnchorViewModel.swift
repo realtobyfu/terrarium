@@ -193,6 +193,10 @@ final class AnchorViewModel {
         // consistent even if the POI's stored specimenKind drifts (FR-21).
         let mappedKind = SpecimenMapping.kind(for: poi.category)
         let quest = Quest(
+            // Stable id derived from the poiRef so re-arriving the same place is
+            // idempotent — WorldStore keys dedup on quest.id (FR-16). A fresh
+            // UUID here would grow a duplicate specimen on every tap.
+            id: Self.stableQuestID(for: poi.poiRef),
             title: "Arrived at \(poi.name)",
             prompt: "You made it to \(poi.name).",
             placeName: poi.name,
@@ -232,6 +236,23 @@ final class AnchorViewModel {
             specimenGrown: specimenGrown,
             discovery: discovery
         )
+    }
+
+    /// A deterministic UUID derived from a POI reference (FNV-1a over two seeds),
+    /// so arriving at the same place always produces the same quest id and
+    /// WorldStore's idempotency check dedups it. Mirrors POIPlacement's stable-
+    /// hash discipline (no Swift Hasher).
+    static func stableQuestID(for poiRef: String) -> UUID {
+        func fnv1a(_ string: String, seed: UInt64) -> UInt64 {
+            var hash = seed
+            for byte in string.utf8 { hash ^= UInt64(byte); hash = hash &* 0x100000001b3 }
+            return hash
+        }
+        let hi = withUnsafeBytes(of: fnv1a(poiRef, seed: 0xcbf29ce484222325).bigEndian) { Array($0) }
+        let lo = withUnsafeBytes(of: fnv1a(poiRef + "#anchor", seed: 0xcbf29ce484222325).bigEndian) { Array($0) }
+        let b = hi + lo
+        return UUID(uuid: (b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+                           b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]))
     }
 
     // -------------------------------------------------------------------------

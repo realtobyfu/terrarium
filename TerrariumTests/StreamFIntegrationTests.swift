@@ -342,6 +342,18 @@ struct DriftSpecimenGrowthTests {
     private let coordA = Coordinate(latitude: 37.7596, longitude: -122.4269)
     private let coordB = Coordinate(latitude: 37.7700, longitude: -122.4350)
 
+    /// Poll until `condition` holds or the timeout elapses. The breadcrumb
+    /// consumer is a fire-and-forget Task, so a fixed sleep is flaky under the
+    /// full parallel suite (MainActor contention) — polling is robust.
+    private func waitUntil(timeout: Duration = .seconds(3),
+                           _ condition: () -> Bool) async {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while ContinuousClock.now < deadline {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
     @Test("A new cell in a Drift session grows a specimen")
     func newCellGrowsSpecimen() async throws {
         let discoveryStore = InMemoryDiscoveryStore()
@@ -361,7 +373,7 @@ struct DriftSpecimenGrowthTests {
         let propsBefore = worldStore.current().props.count
 
         vm.startRamble()
-        try? await Task.sleep(for: .milliseconds(150))
+        await waitUntil { worldStore.current().props.count > propsBefore }
 
         let propsAfter = worldStore.current().props.count
         #expect(propsAfter > propsBefore)
@@ -384,7 +396,9 @@ struct DriftSpecimenGrowthTests {
         vm.worldStore = worldStore
 
         vm.startRamble()
-        try? await Task.sleep(for: .milliseconds(150))
+        await waitUntil {
+            worldStore.current().props.contains { worldStore.journalEntry(forPropID: $0.id) != nil }
+        }
 
         // Find the newly grown specimen(s).
         let props = worldStore.current().props
