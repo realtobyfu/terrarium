@@ -176,7 +176,7 @@ enum SpecimenFactory {
     private static func contactShadow(radius: Float, isFoggy: Bool = false) -> ModelEntity {
         let alpha: CGFloat = isFoggy ? 0.13 : 0.22
         var material = UnlitMaterial(color: UIColor(white: 0, alpha: alpha))
-        material.blending = .transparent(opacity: alpha)
+        material.blending = .transparent(opacity: .init(floatLiteral: Float(alpha)))
         let shadow = ModelEntity(mesh: .generateSphere(radius: radius),
                                  materials: [material])
         shadow.scale = SIMD3(1, 0.08, 1)  // squash into a disc
