@@ -24,3 +24,6 @@ xcuserdata/
 *.xcconfig.local
 Secrets.plist
 .env
+
+# Agent worktrees (transient, linked to main .git)
+.claude/worktrees/

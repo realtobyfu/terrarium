@@ -63,7 +63,53 @@ name clash.
 
 (Appended as each stream lands.)
 
-- **H (Foundation):** ✅ Domain types (`POI`, `RecommendationContext`,
-  `UserPreferences`, `RambleSession`/`DiscoveryCell`, `Discovery`), provider
-  protocols + offline stubs, `AppContainer` wiring + skeleton Anchor/Drift VMs.
-  Build green; contract + stub tests added.
+- **H (Foundation):** ✅ DONE, committed `27af64a` on `explore-drift-anchor`.
+  Domain types (`POI`, `RecommendationContext`, `UserPreferences`,
+  `RambleSession`/`DiscoveryCell`, `Discovery`), provider protocols + offline
+  stubs, `AppContainer` wiring + skeleton Anchor/Drift VMs. Build + tests green.
+
+### Wave 1 — in progress (parallel worktree agents, forked from `27af64a`)
+
+Each agent commits to its own worktree branch and reports back; merge in order
+A → B → C → G into `explore-drift-anchor`, then I swap stubs→real in AppContainer.
+
+| Stream | Agent ID | Sim | Status |
+|---|---|---|---|
+| A Catalog | a17062e463ccd6d1f | iPhone 17 | ✅ MERGED (40 POIs, 17 tests) |
+| B Context | a8d31b2a317b591aa | iPhone 17 Pro | ✅ MERGED (62 tests) |
+| C Ranker | a37163529f1aa12f7 | iPhone 17 Pro Max | ✅ MERGED (27 tests) |
+| G Onboard/Shell | ab5800ea87ca93f1b | iPhone Air | running |
+
+**Stream B integration TODOs (affect Waves 2/3):**
+- `LocationSessionManager.currentCoordinate()` returns **nil while a session is
+  active** (B chose breadcrumb stream as the primary path). Anchor (D) needs a
+  current coord for distance/ranking, and the geofence verifier (F) needs a
+  one-shot fix. **Fix at integration:** have `currentCoordinate()` return the last
+  breadcrumb when active, else a momentary read — OR have D/F do a momentary read.
+- WeatherKit entitlement is a deploy-time capability (App ID). Without it the
+  provider returns the `.clear` fallback; app still works.
+- Temporary full-accuracy needs `NSLocationTemporaryUsageDescriptionDictionary`
+  (`ExploreAccuracy` key) added later.
+
+C merged via `--no-ff` (branch `worktree-agent-a37163529f1aa12f7`); added
+`OpenNowEvaluator.swift` + `RulesRecommender.swift` (+ tests). Integration branch
+builds green. Named weights live in `RulesRecommender` (noveltyExplored=0.3,
+weatherFit boosts, distancePenalty=0.75, persona additive bonuses).
+
+**Merge / file-ownership notes for integration:**
+- A, B, C do NOT touch `App/*`. Only **G** edits `RootView.swift` + `AppContainer.swift`.
+- Only **B** edits `project.pbxproj` (the `INFOPLIST_KEY_NSLocationWhenInUseUsageDescription` build setting).
+- After merging A/B/C/G: in `AppContainer`, swap `StubPOICatalog`→`BundledPOICatalog`,
+  `StubWeatherProvider`→`WeatherKitProvider`, `StubLocationSession`→`LocationSessionManager`,
+  `StubRecommender`→`RulesRecommender`. Keep stubs as the `inMemory`/test fallback.
+
+### Known risks / merge-time checks
+- **WeatherKit name collision:** `import WeatherKit` brings in `WeatherKit.Weather`,
+  shadowing our `Weather` enum (symptom: `Type 'Weather' has no member 'clear'`).
+  Stream B must disambiguate (e.g. a `typealias` in a non-WeatherKit file, or
+  fully-qualify `WeatherKit.WeatherCondition`). Verify B's build is actually green
+  before merging.
+
+### Remaining waves
+- **Wave 2:** D Anchor (needs A,B,C — concierge screen US-D1 + terrarium handoff US-D2), E Drift (needs B+cells — US-E1 session, US-E2 fog/geohash cells, US-E3 route gen). Run as 2 parallel worktree agents off the merged branch. D creates `AnchorView.swift`, E creates `DriftView.swift`; shell placeholders (from G) get swapped to these.
+- **Wave 3 (serial):** F Integration — real `LocationVerifier` geofence (US-F1), discovery→specimen mapping w/ context variants (US-F2), discovery journaling (US-F3); wire D&E discoveries into `WorldStore`; full suite + both-mode Simulator smoke test.

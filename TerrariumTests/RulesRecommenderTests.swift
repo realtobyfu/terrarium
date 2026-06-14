@@ -429,7 +429,7 @@ struct RulesRecommenderTests {
     // MARK: 8. driftSeeds returns at most driftSeedCount items
     // -------------------------------------------------------------------------
 
-    @Test("driftSeeds returns at most \(RulesRecommender.driftSeedCount) items")
+    @Test("driftSeeds returns at most driftSeedCount items")
     func driftSeedsCountCapped() {
         let pois = (1...10).map { i in makePOI(ref: "poi-\(i)") }
         let recommender = makeRecommender(pois: pois, hoursLookup: { _ in alwaysOpenHours })

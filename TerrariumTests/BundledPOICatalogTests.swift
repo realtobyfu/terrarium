@@ -191,7 +191,7 @@ struct BundledPOICatalogMissingResourceTests {
     func missingResourceReturnsEmpty() {
         // Point at a bundle that has no JSON file named "nonexistent".
         let catalog = BundledPOICatalog(
-            bundle: Bundle(for: BundledPOICatalogMissingResourceTests.self as AnyClass),
+            bundle: .main,
             resourceName: "nonexistent-pois-file-that-does-not-exist"
         )
         #expect(catalog.all().isEmpty)
@@ -200,7 +200,7 @@ struct BundledPOICatalogMissingResourceTests {
     @Test("allowedRefs() returns empty set when resource does not exist")
     func missingResourceAllowedRefsIsEmpty() {
         let catalog = BundledPOICatalog(
-            bundle: Bundle(for: BundledPOICatalogMissingResourceTests.self as AnyClass),
+            bundle: .main,
             resourceName: "nonexistent-pois-file-that-does-not-exist"
         )
         #expect(catalog.allowedRefs().isEmpty)

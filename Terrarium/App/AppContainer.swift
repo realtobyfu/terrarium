@@ -71,6 +71,24 @@ final class AppContainer {
         }
     }
 
+    /// Production composition: the real Explore providers wired together.
+    /// Used by `TerrariumApp`. The `init` defaults stay as offline stubs so
+    /// tests, previews and the `@Entry` default never touch WeatherKit or the
+    /// location-permission prompt. The recommender and the container share one
+    /// `DiscoveryStore` instance so novelty reflects recorded discoveries.
+    static func live() -> AppContainer {
+        let catalog = BundledPOICatalog()
+        let discoveryStore = InMemoryDiscoveryStore()
+        let recommender = RulesRecommender(catalog: catalog, discoveryStore: discoveryStore)
+        return AppContainer(
+            catalog: catalog,
+            weather: WeatherKitProvider(),
+            location: LocationSessionManager(),
+            recommender: recommender,
+            discoveryStore: discoveryStore
+        )
+    }
+
     /// The persistent world store, when available (drives completion/journal).
     var worldStore: WorldStore? { worldProvider as? WorldStore }
 
