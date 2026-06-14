@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Concept E — plump chicken footprint, tree-logo style.
+       Brown soil background, cream outline + dark interior. 3 forward toes + back toe. -->
+  <g id="background">
+    <rect x="0" y="0" width="1024" height="1024" fill="#6B4A33"/>
+  </g>
+
+  <g id="foreground" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- cream outline layer -->
+    <g stroke="#F4ECDD">
+      <path d="M512 575 L512 265" stroke-width="96"/>
+      <path d="M512 575 L321 331" stroke-width="96"/>
+      <path d="M512 575 L703 331" stroke-width="96"/>
+      <path d="M512 575 L512 715" stroke-width="58"/>
+    </g>
+    <!-- dark interior layer -->
+    <g stroke="#2C1E15">
+      <path d="M512 575 L512 265" stroke-width="72"/>
+      <path d="M512 575 L321 331" stroke-width="72"/>
+      <path d="M512 575 L703 331" stroke-width="72"/>
+      <path d="M512 575 L512 715" stroke-width="38"/>
+    </g>
+  </g>
+</svg>

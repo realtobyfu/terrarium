@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Concept F — plump webbed DUCK footprint. Solid single-color foreground (Liquid-Glass
+       mask-friendly) over a separable gradient background. Palette: soil + cream. -->
+  <defs>
+    <linearGradient id="bgSoil" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7A5740"/>
+      <stop offset="1" stop-color="#553A28"/>
+    </linearGradient>
+  </defs>
+
+  <g id="background">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#bgSoil)"/>
+  </g>
+
+  <g id="foreground" transform="translate(512 520) scale(1.12) translate(-512 -520)">
+    <!-- webbing -->
+    <path d="M512 645 L300 345 Q406 455 512 300 Q618 455 724 345 Z" fill="#F4ECDD"/>
+    <!-- plump toes -->
+    <g fill="none" stroke="#F4ECDD" stroke-width="88" stroke-linecap="round">
+      <path d="M512 600 L300 345"/>
+      <path d="M512 600 L512 270"/>
+      <path d="M512 600 L724 345"/>
+    </g>
+    <!-- back toe + heel pad -->
+    <path d="M512 605 L512 775" fill="none" stroke="#F4ECDD" stroke-width="58" stroke-linecap="round"/>
+    <circle cx="512" cy="600" r="56" fill="#F4ECDD"/>
+  </g>
+</svg>

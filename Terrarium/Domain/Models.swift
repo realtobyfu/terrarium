@@ -11,7 +11,9 @@ import Foundation
 import simd
 
 /// Coarse weather classification used to modulate the sky palette.
-enum Weather: String, Equatable, CaseIterable {
+/// `Codable` so it can ride along in the POI tag schema (`weatherFit`) and the
+/// `Discovery` context snapshot (§Explore).
+enum Weather: String, Equatable, CaseIterable, Codable {
     case clear, cloudy, fog, rain, snow
 }
 

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Concept C2 — "Pine on legs", full-soil monochrome.
+       Brown soil background, cream outline, deep-brown tree interior, little legs/feet.
+       Most minimal / fully earthy; reads cleanly when tinted (Liquid Glass variants). -->
+  <g id="background">
+    <rect x="0" y="0" width="1024" height="1024" fill="#6B4A33"/>
+  </g>
+
+  <g id="foreground">
+    <g stroke="#F4ECDD" stroke-width="32" stroke-linecap="round">
+      <line x1="486" y1="548" x2="486" y2="726"/>
+      <line x1="538" y1="548" x2="538" y2="726"/>
+    </g>
+
+    <polygon points="512,160 632,374 584,374 706,556 318,556 440,374 392,374"
+             fill="#2C1E15" stroke="#F4ECDD" stroke-width="28" stroke-linejoin="miter"/>
+
+    <polygon points="512,250 568,372 456,372"
+             fill="none" stroke="#F4ECDD" stroke-width="14" stroke-linejoin="miter"/>
+  </g>
+</svg>
