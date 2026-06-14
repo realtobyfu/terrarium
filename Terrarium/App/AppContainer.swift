@@ -24,8 +24,11 @@ final class AppContainer {
     let locationSession: LocationSessionProviding
     let recommender: PlaceRecommending
     let discoveryStore: DiscoveryStore
-    /// Persona/taste prefs; persistence + onboarding capture land in Stream G.
+    /// Persona/taste prefs — loaded from `preferencesStore` on init (Stream G).
     let preferences: UserPreferences
+    /// UserDefaults-backed persistence for `UserPreferences` and the
+    /// onboarding-seen flag. Injected so unit tests can pass a clean suite.
+    let preferencesStore: PreferencesStore
 
     init(
         sky: SkyStateProviding = SolarSkyStateProvider(),
@@ -35,7 +38,7 @@ final class AppContainer {
         location: LocationSessionProviding = StubLocationSession(),
         recommender: PlaceRecommending? = nil,
         discoveryStore: DiscoveryStore = InMemoryDiscoveryStore(),
-        preferences: UserPreferences = .default,
+        preferencesStore: PreferencesStore = PreferencesStore(),
         inMemory: Bool = false
     ) {
         self.skyProvider = sky
@@ -44,7 +47,10 @@ final class AppContainer {
         self.weatherProvider = weather
         self.locationSession = location
         self.discoveryStore = discoveryStore
-        self.preferences = preferences
+        self.preferencesStore = preferencesStore
+        // Load persisted preferences so the ranker immediately reflects
+        // whatever the user set during onboarding (Stream G / US-G1, FR-19).
+        self.preferences = preferencesStore.load()
         // The recommender reads the catalog + discovery store; default to the
         // stub wired to whatever catalog/store we were given (Stream C swaps it).
         self.recommender = recommender ?? StubRecommender(catalog: catalog, discoveries: discoveryStore)
