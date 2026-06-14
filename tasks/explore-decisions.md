@@ -149,7 +149,22 @@ integration commit `6627874`.
 ### Wave 3 — in progress (serial, final; forked from `6627874`)
 | Stream | Agent ID | Sim | Status |
 |---|---|---|---|
-| F Integration | a9f2f74bbf1918294 | iPhone 17 Pro | running |
+| F Integration | a9f2f74bbf1918294 | iPhone 17 Pro | ✅ MERGED (36 suites) |
+
+**Wave 3 COMPLETE.** F merged; integration fixes applied by orchestrator:
+- `SpecimenFactory` foggy shadow opacity: `.transparent(opacity:)` needs
+  `Opacity(floatLiteral:)`, not a `CGFloat` (build error F's env missed).
+- `GeofenceTests` → `@MainActor` (uses a @MainActor mock); `WorldStoreTests`
+  `FixedLocationSession` → `final class` (LocationSessionProviding is AnyObject).
+- **Real bug:** `AnchorViewModel.arrive()` used a fresh `UUID()` per call →
+  non-idempotent (WorldStore dedups on quest.id). Now derives a **stable** id
+  from poiRef. Re-arriving the same place no longer double-grows.
+- De-flaked StreamF Drift specimen tests (poll vs fixed 150ms sleep).
+- **Full suite GREEN: 308 passed, 0 failed** (single-process run; the SwiftData
+  many-containers trap F worried about did not reproduce — suites are
+  `.serialized`). Final commit `69c6c4d`.
+
+### ALL WAVES COMPLETE — remaining: both-mode Simulator smoke test + wrap-up.
 
 F: real `LocationVerifier` geofence + one-shot location fix (US-F1); discovery→
 specimen mapping + foggy/clear variant, migration-safe `WorldPropRecord.variant`
