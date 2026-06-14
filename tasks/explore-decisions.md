@@ -94,8 +94,16 @@ on iPhone 17. Integration commit `91340b9`.
 ### Wave 2 — in progress (parallel, forked from `91340b9`)
 | Stream | Agent ID | Status |
 |---|---|---|
-| D Anchor | (launching) | running |
-| E Drift | (launching) | running |
+| D Anchor | afda79ca89c88149e | iPhone 17 Pro | ✅ MERGED (10 tests) |
+| E Drift | a31070d9eb03fd2ce | iPhone 17 Pro Max | running |
+
+**Wave-2 integration TODOs (do after E merges):**
+- Swap shell placeholders → real screens in `ExploreFeature/ExploreShellView.swift`:
+  `AnchorPlaceholderView` → `AnchorView(viewModel: makeAnchorViewModel())`,
+  Drift placeholder → `DriftView(...)`.
+- Inject D's `arrivalVerifier` seam later from F's real `LocationVerifier`.
+- Still-open one-shot location read (`currentCoordinate()` nil outside session) —
+  fix in F so Anchor distance + geofence work.
 
 Wave-2 agents do NOT run simulator screenshots (avoids the G-style stall) and do
 NOT edit `ExploreShellView.swift` — I wire their real views into the shell + run a
