@@ -4,19 +4,13 @@
 //
 //  Pulls the composition root from the environment and decides what to show:
 //
-//   • First launch → OnboardingFlowView (US-G1/G2). Shown once; persisted via
-//     `PreferencesStore.hasCompletedOnboarding`. On completion or skip the flag
-//     is set and `showOnboarding` flips to false.
+//   • First launch → OnboardingFlowView (US-G1/G2). The Liquid Glass "Hidden
+//     Garden" onboarding (persona step cut — interests is the first step). Shown
+//     once; persisted via `PreferencesStore.hasCompletedOnboarding`.
 //
-//   • Returning launch → ExploreShellView (US-G3). Hosts Home (globe), Drift,
-//     and Anchor as three tabs. The existing HomeView is tab 0, so the original
-//     globe experience is always reachable.
-//
-//  Stream G edits: added `showOnboarding` state and the onboarding/shell branch.
-//  The `ExploreShellView` is the new root for returning users; it owns HomeView
-//  internally so the globe is always one tap away on the Home tab.
-//
-//  Keep edits minimal and additive so Wave-3 merge is clean.
+//   • Returning launch → ExploreShellView (US-G3). The Liquid Glass tab shell:
+//     Home (globe) · Drift (ramble + fog map) · Anchor (concierge). Home is tab 0,
+//     so the original globe experience is always reachable.
 //
 
 import SwiftUI

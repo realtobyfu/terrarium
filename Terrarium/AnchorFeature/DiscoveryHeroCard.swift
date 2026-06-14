@@ -8,7 +8,7 @@
 //
 //  Pure & context-agnostic: it takes already-formatted strings so it carries no
 //  business logic and previews in isolation. The owning screen
-//  (DiscoveryGlassView) feeds it from AnchorViewModel.
+//  (AnchorView) feeds it from AnchorViewModel.
 //
 
 import SwiftUI

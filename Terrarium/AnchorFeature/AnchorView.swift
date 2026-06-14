@@ -1,349 +1,321 @@
 //
 //  AnchorView.swift
-//  Terrarium — AnchorFeature
+//  Terrarium — Prototypes
 //
-//  US-D1 + US-D2: The Anchor concierge screen.
+//  A Liquid-Glass redesign of the Anchor concierge screen ("one great place"),
+//  built to match the "Magical Discovery / The Hidden Garden" mockup. It is a
+//  drop-in alternative to AnchorView: it drives the SAME `AnchorViewModel`
+//  (pick · re-roll · Maps handoff · "I'm here" arrival · loading/empty) — only the
+//  presentation changes.
 //
-//  Layout:
-//   • Background: warm amber gradient (matches existing shell palette)
-//   • Header: "Anchor" wordmark + current weather/time chip
-//   • Pick card: name, category, neighborhood, vibe line, walk time, open indicator
-//   • Action row: [Another] (secondary) + [Take me there] (primary)
-//   • "I'm here" confirmation card (US-D2) once the user has navigated there
-//   • Empty state when the ranker finds nothing open
-//   • Location-off state when permissions prevent coordinate use
+//  iOS 26 APIs used: glassEffect / GlassEffectContainer (top bar, pills, name
+//  card, state cards), .buttonStyle(.glass / .glassProminent) (actions),
+//  .scrollEdgeEffectStyle for the floating bar, MeshGradient scenic art, plus
+//  .symbolEffect for the reward beat.
 //
 
 import SwiftUI
-import MapKit
 
 struct AnchorView: View {
     @State var viewModel: AnchorViewModel
+    /// Whether to draw this screen's own floating bottom nav. When hosted inside
+    /// `ExploreShellView`, the shell supplies the real 3-tab nav, so it passes
+    /// `showsNavBar: false` to avoid a duplicate bar. Defaults to `true` so the
+    /// standalone screen and all previews are unchanged.
+    var showsNavBar: Bool = true
+    @State private var navSelection: DiscoveryNavItem = .explore
 
     var body: some View {
         ZStack {
-            // Background
-            backgroundGradient
-                .ignoresSafeArea()
+            backgroundWash.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Header
-                headerBar
+            // Floating glass shell. safeAreaInset on the ScrollView keeps content
+            // from ever hiding behind the bars (the CTA stays reachable) while the
+            // content still slides under the glass with the soft scroll-edge effect.
+            scrollContent
+                .safeAreaInset(edge: .top) {
+                    DiscoveryTopBar(
+                        weatherSystemImage: (viewModel.context?.weather ?? .clear).glyph,
+                        weatherText: weatherChipText
+                    )
                     .padding(.horizontal, Theme.Spacing.l)
-                    .padding(.top, Theme.Spacing.l)
-
-                Spacer()
-
-                // Main content
-                Group {
-                    if viewModel.isLoading {
-                        loadingState
-                    } else if let result = viewModel.arrivalResult {
-                        arrivalConfirmation(result)
-                    } else if let poi = viewModel.pick {
-                        pickCard(poi)
-                    } else {
-                        emptyState
+                    .padding(.bottom, Theme.Spacing.s)
+                }
+                .safeAreaInset(edge: .bottom) {
+                    pinnedActions
+                }
+                .safeAreaInset(edge: .bottom) {
+                    if showsNavBar {
+                        DiscoveryTabBar(selection: $navSelection)
+                            .padding(.bottom, Theme.Spacing.s)
                     }
                 }
-                .padding(.horizontal, Theme.Spacing.l)
-
-                Spacer()
-
-                // Bottom spacer for the tab bar (ExploreShellView renders it)
-                Spacer().frame(height: 88)
-            }
         }
         .task {
-            if viewModel.pick == nil {
+            if viewModel.pick == nil && viewModel.arrivalResult == nil {
                 await viewModel.refresh()
             }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // MARK: Background
-    // -------------------------------------------------------------------------
+    // MARK: Scrolling content
 
-    private var backgroundGradient: some View {
+    private var scrollContent: some View {
+        ScrollView {
+            VStack(spacing: Theme.Spacing.xl) {
+                header
+
+                Group {
+                    if viewModel.isLoading {
+                        LoadingHeroCard()
+                    } else if let result = viewModel.arrivalResult {
+                        ArrivalCard(
+                            placeName: result.poi.name,
+                            grew: result.specimenGrown,
+                            onAnother: { Task { await viewModel.refresh() } }
+                        )
+                    } else if let poi = viewModel.pick {
+                        // Actions are pinned above the tab bar (see safeAreaInset)
+                        // so the CTA is always reachable on this concierge screen.
+                        DiscoveryHeroCard(
+                            poiRef: poi.poiRef,
+                            name: poi.name,
+                            category: poi.category,
+                            weather: viewModel.context?.weather ?? .clear,
+                            eyebrow: "\(poi.category.label) · \(poi.neighborhood)",
+                            description: viewModel.vibeLine,
+                            openText: viewModel.pickIsLikelyOpen ? "Open Now" : "Hours vary",
+                            walkText: viewModel.walkInfo.map { "\($0.walkMinutes) min" }
+                        )
+                    } else {
+                        EmptyDiscoveryCard(onRetry: { Task { await viewModel.refresh() } })
+                    }
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.l)
+            .padding(.top, Theme.Spacing.s)
+            .padding(.bottom, Theme.Spacing.l)
+        }
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        .scrollIndicators(.hidden)
+    }
+
+    private var header: some View {
+        VStack(spacing: Theme.Spacing.xs) {
+            Text("Discovery")
+                .font(Theme.Typography.body(13, weight: .semibold))
+                .tracking(2.0)
+                .foregroundStyle(Theme.Garden.mossLight)
+            Text("The Hidden Garden")
+                .font(Theme.Typography.display(30, weight: .bold))
+                .foregroundStyle(Theme.Palette.title)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    // MARK: Actions
+
+    /// Whether the concierge actions should be pinned (only when a pick is shown).
+    private var showsActions: Bool {
+        viewModel.pick != nil && !viewModel.isLoading && viewModel.arrivalResult == nil
+    }
+
+    @ViewBuilder
+    private var pinnedActions: some View {
+        if showsActions {
+            actionArea
+                .padding(.horizontal, Theme.Spacing.l)
+                .padding(.top, Theme.Spacing.m)
+                .background(
+                    // Fade the scrolling content out behind the pinned actions.
+                    LinearGradient(
+                        colors: [Color(hex: "FBF2E0").opacity(0), Color(hex: "FBF2E0").opacity(0.92), Color(hex: "FBF2E0")],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
+                )
+        }
+    }
+
+    private var actionArea: some View {
+        GlassEffectContainer(spacing: Theme.Spacing.m) {
+            VStack(spacing: Theme.Spacing.m) {
+                // Primary — Maps handoff (prominent glass, moss tinted).
+                Button {
+                    viewModel.openInMaps()
+                } label: {
+                    Label("Take me there", systemImage: "figure.walk")
+                        .font(Theme.Typography.body(17, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Theme.Garden.moss)
+                .controlSize(.large)
+
+                HStack(spacing: Theme.Spacing.m) {
+                    // Secondary — re-roll.
+                    Button {
+                        withAnimation(.smooth) { viewModel.rollAnother() }
+                    } label: {
+                        Label("Another", systemImage: "arrow.clockwise")
+                            .font(Theme.Typography.body(15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.glass)
+                    .tint(Theme.Garden.mossLight)
+
+                    // Rewarding action — arrival (pine tint sets it apart).
+                    Button {
+                        Task { await viewModel.arrive() }
+                    } label: {
+                        Label("I'm here", systemImage: "mappin.and.ellipse")
+                            .font(Theme.Typography.body(15, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.glass)
+                    .tint(Theme.Garden.pine)
+                }
+            }
+        }
+    }
+
+    // MARK: Helpers
+
+    private var backgroundWash: some View {
         LinearGradient(
-            colors: [Color(hex: "F2E2C4"), Color(hex: "FBF2E0")],
+            colors: [Color(hex: "F2E8D2"), Color(hex: "FBF2E0"), Color(hex: "EFF1E2")],
             startPoint: .top,
             endPoint: .bottom
         )
     }
 
-    // -------------------------------------------------------------------------
-    // MARK: Header
-    // -------------------------------------------------------------------------
-
-    private var headerBar: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Anchor")
-                    .font(Theme.Typography.display(26, weight: .medium))
-                    .foregroundStyle(Theme.Palette.title)
-                Text("Your one great place.")
-                    .font(Theme.Typography.body(13))
-                    .foregroundStyle(Theme.Palette.secondary)
-            }
-
-            Spacer()
-
-            if let ctx = viewModel.context {
-                contextChip(weather: ctx.weather, timeOfDay: ctx.timeOfDay)
-            }
-        }
+    private var weatherChipText: String {
+        guard let ctx = viewModel.context else { return "—" }
+        return "\(ctx.weather.label) · \(ctx.timeOfDay.rawValue)"
     }
+}
 
-    private func contextChip(weather: Weather, timeOfDay: DayPart) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: weatherIcon(weather))
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.Palette.accent)
-            Text("\(weatherLabel(weather)) · \(timeOfDay.rawValue)")
-                .font(Theme.Typography.body(12, weight: .medium))
-                .foregroundStyle(Theme.Palette.secondary)
-        }
-        .padding(.horizontal, Theme.Spacing.m)
-        .padding(.vertical, Theme.Spacing.s)
-        .background(
-            Capsule().fill(Theme.Palette.chipSurface)
-        )
-        .overlay(
-            Capsule().strokeBorder(Theme.Palette.cardBorder, lineWidth: 1)
-        )
-    }
+// MARK: - State cards
 
-    // -------------------------------------------------------------------------
-    // MARK: Pick card (main state)
-    // -------------------------------------------------------------------------
+/// Celebratory arrival confirmation (US-D2) styled as a glass island.
+private struct ArrivalCard: View {
+    let placeName: String
+    let grew: Bool
+    let onAnother: () -> Void
 
-    private func pickCard(_ poi: POI) -> some View {
-        VStack(spacing: Theme.Spacing.l) {
-            SoftPanel(cornerRadius: Theme.Radius.card) {
-                VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-
-                    // Category + neighborhood eyebrow
-                    HStack {
-                        Text("\(categoryLabel(poi.category)) · \(poi.neighborhood)")
-                            .font(Theme.Typography.body(12, weight: .medium))
-                            .tracking(0.8)
-                            .foregroundStyle(Theme.Palette.label)
-
-                        Spacer()
-
-                        openNowPill(poi)
-                    }
-
-                    // Place name
-                    Text(poi.name)
-                        .font(Theme.Typography.display(28, weight: .medium))
-                        .foregroundStyle(Theme.Palette.title)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    // Vibe line (weather-aware)
-                    if let vibe = viewModel.vibeLine {
-                        Text(vibe)
-                            .font(Theme.Typography.body(15))
-                            .foregroundStyle(Theme.Palette.secondary)
-                    }
-
-                    // Walk info (only when coordinate is available)
-                    if let walk = viewModel.walkInfo {
-                        HStack(spacing: 6) {
-                            Image(systemName: "figure.walk")
-                                .font(.system(size: 13))
-                                .foregroundStyle(Theme.Palette.accent)
-                            Text(walk.label)
-                                .font(Theme.Typography.body(13, weight: .medium))
-                                .foregroundStyle(Theme.Palette.secondary)
-                        }
-                    }
-
-                    // Price + price tier
-                    HStack(spacing: 6) {
-                        Image(systemName: "tag")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Theme.Palette.label)
-                        Text(poi.price.rawValue.isEmpty ? "free" : poi.price.rawValue)
-                            .font(Theme.Typography.body(13))
-                            .foregroundStyle(Theme.Palette.label)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Theme.Spacing.l)
-            }
-
-            // Action buttons
-            actionRow
-        }
-    }
-
-    private func openNowPill(_ poi: POI) -> some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(poi.hoursRef != nil ? Color.green : Color.orange)
-                .frame(width: 6, height: 6)
-            Text(poi.hoursRef != nil ? "Open now" : "Hours vary")
-                .font(Theme.Typography.body(11, weight: .medium))
-                .foregroundStyle(Theme.Palette.secondary)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            Capsule().fill(Theme.Palette.chipSurface)
-        )
-        .overlay(
-            Capsule().strokeBorder(Theme.Palette.cardBorder, lineWidth: 1)
-        )
-    }
-
-    private var actionRow: some View {
-        VStack(spacing: Theme.Spacing.m) {
-            // Primary: Maps handoff
-            GlowButton(title: "Take me there") {
-                viewModel.openInMaps()
-            }
-
-            HStack(spacing: Theme.Spacing.m) {
-                // Secondary: re-roll
-                Button {
-                    viewModel.rollAnother()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 14, weight: .medium))
-                        Text("Another")
-                            .font(Theme.Typography.body(15, weight: .medium))
-                    }
-                    .foregroundStyle(Theme.Palette.accent)
-                    .padding(.horizontal, Theme.Spacing.l)
-                    .padding(.vertical, Theme.Spacing.m)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Theme.Palette.chipSurface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Theme.Palette.cardBorder, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-
-                // US-D2 honour-mode arrival
-                Button {
-                    Task { await viewModel.arrive() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle")
-                            .font(.system(size: 14, weight: .medium))
-                        Text("I'm here")
-                            .font(Theme.Typography.body(15, weight: .medium))
-                    }
-                    .foregroundStyle(Theme.Palette.secondary)
-                    .padding(.horizontal, Theme.Spacing.l)
-                    .padding(.vertical, Theme.Spacing.m)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Theme.Palette.chipSurface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(Theme.Palette.cardBorder, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // MARK: Arrival confirmation (US-D2)
-    // -------------------------------------------------------------------------
-
-    private func arrivalConfirmation(_ result: ArrivalResult) -> some View {
+    var body: some View {
         VStack(spacing: Theme.Spacing.xl) {
-            SoftPanel(cornerRadius: Theme.Radius.card) {
-                VStack(spacing: Theme.Spacing.l) {
-                    Image(systemName: result.specimenGrown ? "leaf.circle.fill" : "checkmark.circle.fill")
-                        .font(.system(size: 48))
-                        .foregroundStyle(Theme.Palette.accent)
+            VStack(spacing: Theme.Spacing.l) {
+                Image(systemName: grew ? "leaf.circle.fill" : "checkmark.circle.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(Theme.Garden.moss)
+                    .symbolEffect(.bounce, value: grew)
 
-                    VStack(spacing: Theme.Spacing.s) {
-                        Text(result.specimenGrown ? "Your terrarium grew!" : "Arrival recorded")
-                            .font(Theme.Typography.display(22, weight: .medium))
-                            .foregroundStyle(Theme.Palette.title)
-
-                        Text(result.specimenGrown
-                             ? "A new specimen has sprouted at \(result.poi.name)."
-                             : "You've been to \(result.poi.name). Discovery logged.")
-                            .font(Theme.Typography.body(15))
-                            .foregroundStyle(Theme.Palette.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-                .padding(Theme.Spacing.xl)
-                .frame(maxWidth: .infinity)
-            }
-
-            GlowButton(title: "Find Another Place") {
-                Task { await viewModel.refresh() }
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // MARK: Empty state
-    // -------------------------------------------------------------------------
-
-    private var emptyState: some View {
-        VStack(spacing: Theme.Spacing.xl) {
-            Image(systemName: "mappin.slash.circle")
-                .font(.system(size: 56))
-                .foregroundStyle(Theme.Palette.label)
-
-            VStack(spacing: Theme.Spacing.m) {
-                Text("Nothing open right now")
-                    .font(Theme.Typography.display(22, weight: .medium))
+                Text(grew ? "Your terrarium grew!" : "Arrival recorded")
+                    .font(Theme.Typography.display(24, weight: .bold))
                     .foregroundStyle(Theme.Palette.title)
+                    .multilineTextAlignment(.center)
 
-                Text("The catalog is quiet at this hour. Check back soon, or expand your radius in settings.")
+                Text(grew
+                     ? "A new specimen has sprouted at \(placeName). Tap the globe to visit it."
+                     : "You've been to \(placeName). Discovery logged.")
                     .font(Theme.Typography.body(15))
                     .foregroundStyle(Theme.Palette.secondary)
                     .multilineTextAlignment(.center)
             }
+            .padding(Theme.Spacing.xl)
+            .frame(maxWidth: .infinity)
+            .glassEffect(.regular.tint(Theme.Garden.leaf.opacity(0.18)), in: .rect(cornerRadius: Theme.Radius.glass))
 
-            GlowButton(title: "Try Again") {
-                Task { await viewModel.refresh() }
+            Button(action: onAnother) {
+                Label("Find another place", systemImage: "sparkles")
+                    .font(Theme.Typography.body(17, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
             }
+            .buttonStyle(.glassProminent)
+            .tint(Theme.Garden.moss)
+            .controlSize(.large)
         }
     }
+}
 
-    // -------------------------------------------------------------------------
-    // MARK: Loading state
-    // -------------------------------------------------------------------------
+/// Friendly empty state when the ranker finds nothing open.
+private struct EmptyDiscoveryCard: View {
+    let onRetry: () -> Void
 
-    private var loadingState: some View {
+    var body: some View {
         VStack(spacing: Theme.Spacing.xl) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(Theme.Palette.accent)
+            VStack(spacing: Theme.Spacing.l) {
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Theme.Garden.pineLight)
 
-            Text("Finding your place…")
-                .font(Theme.Typography.body(16))
-                .foregroundStyle(Theme.Palette.secondary)
+                Text("The garden is quiet")
+                    .font(Theme.Typography.display(22, weight: .bold))
+                    .foregroundStyle(Theme.Palette.title)
+
+                Text("Nothing's open at this hour. Check back soon, or widen your radius in settings.")
+                    .font(Theme.Typography.body(15))
+                    .foregroundStyle(Theme.Palette.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(Theme.Spacing.xl)
+            .frame(maxWidth: .infinity)
+            .glassEffect(.regular, in: .rect(cornerRadius: Theme.Radius.glass))
+
+            Button(action: onRetry) {
+                Label("Try again", systemImage: "arrow.clockwise")
+                    .font(Theme.Typography.body(17, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(Theme.Garden.moss)
+            .controlSize(.large)
         }
     }
+}
 
-    // -------------------------------------------------------------------------
-    // MARK: Helpers
-    // -------------------------------------------------------------------------
+/// Skeleton while a pick is being assembled.
+private struct LoadingHeroCard: View {
+    @State private var shimmer = false
 
-    private func weatherIcon(_ weather: Weather) -> String {
-        switch weather {
+    var body: some View {
+        SoftPanel(cornerRadius: Theme.Radius.hero) {
+            VStack(alignment: .leading, spacing: Theme.Spacing.l) {
+                RoundedRectangle(cornerRadius: Theme.Radius.heroInner, style: .continuous)
+                    .fill(Theme.Palette.chipSurface)
+                    .aspectRatio(4.0 / 5.0, contentMode: .fit)
+                    .overlay {
+                        VStack(spacing: Theme.Spacing.m) {
+                            ProgressView().tint(Theme.Garden.moss)
+                            Text("Finding your place…")
+                                .font(Theme.Typography.body(15))
+                                .foregroundStyle(Theme.Palette.secondary)
+                        }
+                    }
+                    .opacity(shimmer ? 0.6 : 1.0)
+
+                RoundedRectangle(cornerRadius: 6).fill(Theme.Palette.chipSurface).frame(height: 12).frame(maxWidth: 120)
+                RoundedRectangle(cornerRadius: 6).fill(Theme.Palette.chipSurface).frame(height: 16)
+            }
+            .padding(Theme.Spacing.l)
+        }
+        .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: shimmer)
+        .onAppear { shimmer = true }
+    }
+}
+
+// MARK: - Weather / category display helpers (file-scoped)
+
+private extension Weather {
+    var glyph: String {
+        switch self {
         case .clear:  return "sun.max.fill"
         case .cloudy: return "cloud.fill"
         case .fog:    return "cloud.fog.fill"
@@ -351,9 +323,8 @@ struct AnchorView: View {
         case .snow:   return "cloud.snow.fill"
         }
     }
-
-    private func weatherLabel(_ weather: Weather) -> String {
-        switch weather {
+    var label: String {
+        switch self {
         case .clear:  return "Clear"
         case .cloudy: return "Cloudy"
         case .fog:    return "Foggy"
@@ -361,9 +332,11 @@ struct AnchorView: View {
         case .snow:   return "Snowy"
         }
     }
+}
 
-    private func categoryLabel(_ category: POICategory) -> String {
-        switch category {
+private extension POICategory {
+    var label: String {
+        switch self {
         case .park:       return "Park"
         case .coffee:     return "Coffee"
         case .bookstore:  return "Bookstore"
@@ -372,39 +345,69 @@ struct AnchorView: View {
         case .market:     return "Market"
         case .museum:     return "Museum"
         case .bar:        return "Bar"
-        case .other:      return "Other"
+        case .other:      return "Spot"
         }
     }
 }
 
-// -------------------------------------------------------------------------
-// MARK: Preview
-// -------------------------------------------------------------------------
+// MARK: - Previews
 
-#Preview("Anchor — pick loaded") {
-    let vm = AnchorViewModel(
-        catalog: StubPOICatalog(),
-        weather: StubWeatherProvider(),
-        recommender: StubRecommender(
-            catalog: StubPOICatalog(),
-            discoveries: InMemoryDiscoveryStore()
-        ),
-        location: StubLocationSession(),
-        discoveries: InMemoryDiscoveryStore()
-    )
-    // Pre-seed state for the preview without async
-    return AnchorView(viewModel: vm)
+/// A preview-only location session so `walkInfo` resolves (the app stub returns nil).
+private final class PreviewLocationSession: LocationSessionProviding {
+    private(set) var isActive = false
+    func start() { isActive = true }
+    func stop() { isActive = false }
+    func breadcrumbStream() -> AsyncStream<Coordinate> { AsyncStream { $0.finish() } }
+    // ~1 km north of the Mission fixtures → a believable walk time.
+    func currentCoordinate() async -> Coordinate? {
+        Coordinate(latitude: 37.7686, longitude: -122.4269)
+    }
 }
 
-#Preview("Anchor — foggy morning") {
+private struct PreviewClearWeather: WeatherProviding {
+    func current() async -> Weather { .clear }
+}
+
+private func makePreviewVM(weather: WeatherProviding, location: LocationSessionProviding) -> AnchorViewModel {
     let store = InMemoryDiscoveryStore()
     let catalog = StubPOICatalog()
-    let vm = AnchorViewModel(
+    return AnchorViewModel(
         catalog: catalog,
-        weather: StubWeatherProvider(),   // returns .fog
+        weather: weather,
         recommender: StubRecommender(catalog: catalog, discoveries: store),
-        location: StubLocationSession(),
+        location: location,
         discoveries: store
     )
-    return AnchorView(viewModel: vm)
+}
+
+#Preview("Discovery — clear, with walk time") {
+    AnchorView(viewModel: makePreviewVM(
+        weather: PreviewClearWeather(),
+        location: PreviewLocationSession()
+    ))
+}
+
+#Preview("Discovery — foggy evening") {
+    AnchorView(viewModel: makePreviewVM(
+        weather: StubWeatherProvider(),       // returns .fog
+        location: StubLocationSession()       // no coordinate → walk pill hidden
+    ))
+}
+
+#Preview("Arrival — specimen grew") {
+    ZStack {
+        LinearGradient(colors: [Color(hex: "F2E8D2"), Color(hex: "FBF2E0")],
+                       startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+        ArrivalCard(placeName: "Dolores Park", grew: true, onAnother: {})
+            .padding()
+    }
+}
+
+#Preview("Empty state") {
+    ZStack {
+        LinearGradient(colors: [Color(hex: "F2E8D2"), Color(hex: "FBF2E0")],
+                       startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+        EmptyDiscoveryCard(onRetry: {})
+            .padding()
+    }
 }
