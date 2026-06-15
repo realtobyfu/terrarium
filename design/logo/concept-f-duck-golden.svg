@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Concept F — plump webbed DUCK footprint. Golden-hour palette (ties to the in-app sky):
+       warm cream -> terracotta -> soil gradient, deep-soil foreground. -->
+  <defs>
+    <linearGradient id="bgGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4D79A"/>
+      <stop offset="0.55" stop-color="#C0744220"/>
+      <stop offset="0.55" stop-color="#BE7242"/>
+      <stop offset="1" stop-color="#6B4A33"/>
+    </linearGradient>
+  </defs>
+
+  <g id="background">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#bgGold)"/>
+  </g>
+
+  <g id="foreground" transform="translate(512 520) scale(1.12) translate(-512 -520)">
+    <path d="M512 645 L300 345 Q406 455 512 300 Q618 455 724 345 Z" fill="#2C1E15"/>
+    <g fill="none" stroke="#2C1E15" stroke-width="88" stroke-linecap="round">
+      <path d="M512 600 L300 345"/>
+      <path d="M512 600 L512 270"/>
+      <path d="M512 600 L724 345"/>
+    </g>
+    <path d="M512 605 L512 775" fill="none" stroke="#2C1E15" stroke-width="58" stroke-linecap="round"/>
+    <circle cx="512" cy="600" r="56" fill="#2C1E15"/>
+  </g>
+</svg>

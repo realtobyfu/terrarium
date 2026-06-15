@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Concept D — "Plump paw", pressed into sand.
+       Full-bleed warm sand background, deep-soil paw impression. -->
+  <g id="background">
+    <rect x="0" y="0" width="1024" height="1024" fill="#D8B98A"/>
+  </g>
+
+  <g id="foreground" fill="#4A3325">
+    <path d="M512 486
+             C 452 486 396 512 380 566
+             C 360 632 372 700 430 740
+             C 462 762 478 770 512 770
+             C 546 770 562 762 594 740
+             C 652 700 664 632 644 566
+             C 628 512 572 486 512 486 Z"/>
+    <ellipse cx="360" cy="452" rx="54" ry="70" transform="rotate(-22 360 452)"/>
+    <ellipse cx="456" cy="382" rx="58" ry="76" transform="rotate(-8 456 382)"/>
+    <ellipse cx="568" cy="382" rx="58" ry="76" transform="rotate(8 568 382)"/>
+    <ellipse cx="664" cy="452" rx="54" ry="70" transform="rotate(22 664 452)"/>
+  </g>
+</svg>

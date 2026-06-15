@@ -11,7 +11,9 @@ import Foundation
 import simd
 
 /// Coarse weather classification used to modulate the sky palette.
-enum Weather: String, Equatable, CaseIterable {
+/// `Codable` so it can ride along in the POI tag schema (`weatherFit`) and the
+/// `Discovery` context snapshot (§Explore).
+enum Weather: String, Equatable, CaseIterable, Codable {
     case clear, cloudy, fog, rain, snow
 }
 
@@ -36,11 +38,16 @@ struct WorldProp: Identifiable, Equatable {
     let kind: Kind
     /// (latitude, longitude) in radians.
     let sphereCoordinate: SIMD2<Float>
+    /// Appearance variant key (US-F2): "clear" (default) or "foggy".
+    /// SpecimenFactory reads this to apply a subtle visual difference.
+    let variant: String
 
-    init(id: UUID = UUID(), kind: Kind, sphereCoordinate: SIMD2<Float>) {
+    init(id: UUID = UUID(), kind: Kind, sphereCoordinate: SIMD2<Float>,
+         variant: String = "clear") {
         self.id = id
         self.kind = kind
         self.sphereCoordinate = sphereCoordinate
+        self.variant = variant
     }
 }
 

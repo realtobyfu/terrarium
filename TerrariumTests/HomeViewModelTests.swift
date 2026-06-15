@@ -29,19 +29,8 @@ struct HomeViewModelTests {
         }
     }
 
-    private struct MockQuests: QuestSuggesting {
-        let quest: Quest
-        func suggestion() -> Quest { quest }
-    }
-
-    private func makeViewModel(
-        quest: Quest = Quest(title: "Ocean Beach at dusk",
-                             prompt: "Walk the shore, name three sounds",
-                             placeName: "Ocean Beach")
-    ) -> HomeViewModel {
-        HomeViewModel(sky: MockSky(),
-                      world: MockWorld(),
-                      quests: MockQuests(quest: quest))
+    private func makeViewModel() -> HomeViewModel {
+        HomeViewModel(sky: MockSky(), world: MockWorld())
     }
 
     // MARK: - Tests
@@ -56,23 +45,6 @@ struct HomeViewModelTests {
     func seedsFromProviders() {
         let vm = makeViewModel()
         #expect(vm.sky.locationName == "SF")
-        #expect(vm.suggestedQuest.title == "Ocean Beach at dusk")
-    }
-
-    @Test("beginQuest presents the quest-detail sheet for the suggested quest")
-    func beginQuest() {
-        let quest = Quest(title: "T", prompt: "P", placeName: "Place")
-        let vm = makeViewModel(quest: quest)
-        vm.beginQuest()
-        #expect(vm.activeSheet == .questDetail(quest))
-    }
-
-    @Test("openJournal presents the journal sheet")
-    func openJournal() {
-        let quest = Quest(title: "T", prompt: "P", placeName: "Place")
-        let vm = makeViewModel(quest: quest)
-        vm.openJournal(for: quest)
-        #expect(vm.activeSheet == .journal(quest))
     }
 
     @Test("openGrowthLog presents the growth-log sheet")
@@ -85,7 +57,7 @@ struct HomeViewModelTests {
     @Test("dismissSheet clears the active sheet")
     func dismissSheet() {
         let vm = makeViewModel()
-        vm.beginQuest()
+        vm.openGrowthLog()
         vm.dismissSheet()
         #expect(vm.activeSheet == nil)
     }

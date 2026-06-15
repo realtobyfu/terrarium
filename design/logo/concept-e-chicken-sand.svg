@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Concept E — plump chicken footprint, tree-logo style, sand palette.
+       Warm sand background, cream outline + dark-soil interior. -->
+  <g id="background">
+    <rect x="0" y="0" width="1024" height="1024" fill="#D8B98A"/>
+  </g>
+
+  <g id="foreground" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <g stroke="#F6EEDF">
+      <path d="M512 575 L512 265" stroke-width="96"/>
+      <path d="M512 575 L321 331" stroke-width="96"/>
+      <path d="M512 575 L703 331" stroke-width="96"/>
+      <path d="M512 575 L512 715" stroke-width="58"/>
+    </g>
+    <g stroke="#43301F">
+      <path d="M512 575 L512 265" stroke-width="72"/>
+      <path d="M512 575 L321 331" stroke-width="72"/>
+      <path d="M512 575 L703 331" stroke-width="72"/>
+      <path d="M512 575 L512 715" stroke-width="38"/>
+    </g>
+  </g>
+</svg>

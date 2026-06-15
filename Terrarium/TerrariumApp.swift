@@ -10,7 +10,9 @@ import SwiftUI
 @main
 struct TerrariumApp: App {
     /// The composition root, built once for the app's lifetime.
-    private let container = AppContainer()
+    /// `live()` wires the real Explore providers (bundled catalog, WeatherKit,
+    /// session location, rules recommender); `init` defaults remain stubs.
+    private let container = AppContainer.live()
 
     var body: some Scene {
         WindowGroup {

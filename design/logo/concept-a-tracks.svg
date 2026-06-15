@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Concept A — "Tracks": three bird tracks walking up a soil hill into golden-hour light.
+       Story: the ramble / exploration trail. Recommended for product fit. -->
+  <defs>
+    <linearGradient id="skyA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7EFE4"/>
+      <stop offset="1" stop-color="#ECC79A"/>
+    </linearGradient>
+    <linearGradient id="soilA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8A5E3E"/>
+      <stop offset="1" stop-color="#543926"/>
+    </linearGradient>
+    <radialGradient id="sunA" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F4D08A"/>
+      <stop offset="1" stop-color="#F4D08A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <g id="background">
+    <rect x="0" y="0" width="1024" height="1024" fill="url(#skyA)"/>
+    <circle cx="752" cy="252" r="190" fill="url(#sunA)"/>
+    <circle cx="752" cy="252" r="76" fill="#EFB867"/>
+  </g>
+
+  <g id="foreground">
+    <path d="M0 706 Q512 648 1024 706 L1024 1024 L0 1024 Z" fill="url(#soilA)"/>
+    <path d="M0 706 Q512 648 1024 706" fill="none" stroke="#A9764F" stroke-width="14" stroke-linecap="round" opacity="0.55"/>
+
+    <g fill="none" stroke="#2E1F17" stroke-width="22" stroke-linecap="round">
+      <g transform="translate(338,872) scale(1.15) rotate(18)">
+        <line x1="0" y1="6" x2="0" y2="-62"/>
+        <line x1="0" y1="6" x2="-46" y2="-44"/>
+        <line x1="0" y1="6" x2="46" y2="-44"/>
+        <line x1="0" y1="6" x2="0" y2="34"/>
+      </g>
+      <g transform="translate(520,808) scale(1.0) rotate(18)">
+        <line x1="0" y1="6" x2="0" y2="-62"/>
+        <line x1="0" y1="6" x2="-46" y2="-44"/>
+        <line x1="0" y1="6" x2="46" y2="-44"/>
+        <line x1="0" y1="6" x2="0" y2="34"/>
+      </g>
+      <g transform="translate(694,754) scale(0.84) rotate(18)">
+        <line x1="0" y1="6" x2="0" y2="-62"/>
+        <line x1="0" y1="6" x2="-46" y2="-44"/>
+        <line x1="0" y1="6" x2="46" y2="-44"/>
+        <line x1="0" y1="6" x2="0" y2="34"/>
+      </g>
+    </g>
+  </g>
+</svg>

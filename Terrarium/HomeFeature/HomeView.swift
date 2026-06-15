@@ -16,44 +16,44 @@ struct HomeView: View {
             // 1. Sky
             SkyLayer(state: viewModel.sky)
 
-            // 2. World (3D globe)
+            // 2. World (3D globe). Keyed on a world signature so it rebuilds when
+            // the garden grows (new props) or lushens (vitality), since WorldView
+            // only builds its entities once.
             WorldView(world: viewModel.world, sky: viewModel.sky,
                       onTapSpecimen: { viewModel.openSpecimen(propID: $0) })
+                .id(viewModel.globeSignature)
                 .ignoresSafeArea()
 
-            // 3. Overlay UI
+            // 3. Bottom reward surface (garden progress).
             VStack {
-                HStack(alignment: .top) {
-                    Wordmark()
-                        // Hidden debug affordance: long-press cycles the sky.
-                        .onLongPressGesture(minimumDuration: 0.6) {
-                            withAnimation { viewModel.cycleSky() }
-                        }
-                    Spacer()
-                    LocationChip(sky: viewModel.sky)
-                }
-
                 Spacer()
-
-                QuestCard(quest: viewModel.suggestedQuest,
-                          onBegin: viewModel.beginQuest)
+                GardenProgressCard(
+                    points: viewModel.points,
+                    tier: viewModel.tier,
+                    progress: viewModel.tierProgress,
+                    toNext: viewModel.pointsToNextTier,
+                    onOpenLog: viewModel.openGrowthLog
+                )
             }
             .padding()
         }
+        // Shared glass top bar — same chrome as Drift & Anchor (leaf + weather).
+        .safeAreaInset(edge: .top) {
+            DiscoveryTopBar(
+                weatherSystemImage: viewModel.sky.weather.homeGlyph,
+                weatherText: "\(viewModel.sky.weather.homeLabel) · \(viewModel.sky.localTimeLabel)"
+            )
+            .padding(.horizontal, Theme.Spacing.l)
+            .padding(.bottom, Theme.Spacing.s)
+            // Hidden debug affordance preserved: long-press the bar cycles the sky.
+            .onLongPressGesture(minimumDuration: 0.6) {
+                withAnimation { viewModel.cycleSky() }
+            }
+        }
+        .task { viewModel.refresh() }
         // 4. Presentation
         .sheet(item: $viewModel.activeSheet) { sheet in
             switch sheet {
-            case .questDetail(let quest):
-                QuestDetailView(
-                    quest: quest,
-                    onComplete: { Task { await viewModel.completeQuest(quest) } }
-                )
-            case .journal(let quest):
-                JournalView(
-                    quest: quest,
-                    onSave: { viewModel.saveReflection(for: quest, text: $0) },
-                    onOpenGrowthLog: viewModel.openGrowthLog
-                )
             case .growthLog:
                 GrowthLogView()
             case .specimenJournal(let propID):
@@ -65,10 +65,32 @@ struct HomeView: View {
     }
 }
 
+// MARK: - Weather display (file-scoped, mirrors the Explore top bars)
+
+private extension Weather {
+    var homeGlyph: String {
+        switch self {
+        case .clear:  return "sun.max.fill"
+        case .cloudy: return "cloud.fill"
+        case .fog:    return "cloud.fog.fill"
+        case .rain:   return "cloud.rain.fill"
+        case .snow:   return "cloud.snow.fill"
+        }
+    }
+    var homeLabel: String {
+        switch self {
+        case .clear:  return "Clear"
+        case .cloudy: return "Cloudy"
+        case .fog:    return "Foggy"
+        case .rain:   return "Rainy"
+        case .snow:   return "Snowy"
+        }
+    }
+}
+
 #Preview {
     HomeView(viewModel: HomeViewModel(
         sky: StubSkyStateProvider(),
-        world: StubWorldStateProvider(),
-        quests: StubQuestSuggester()
+        world: StubWorldStateProvider()
     ))
 }
