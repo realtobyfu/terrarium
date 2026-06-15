@@ -24,6 +24,7 @@ struct AnchorView: View {
     /// standalone screen and all previews are unchanged.
     var showsNavBar: Bool = true
     @State private var navSelection: DiscoveryNavItem = .explore
+    @State private var showReward = false
 
     var body: some View {
         ZStack {
@@ -55,6 +56,16 @@ struct AnchorView: View {
             if viewModel.pick == nil && viewModel.arrivalResult == nil {
                 await viewModel.refresh()
             }
+        }
+        // Celebratory beat when an arrival pushes the garden to a new tier.
+        .rewardOverlay(
+            isPresented: $showReward,
+            poiName: viewModel.arrivalResult?.poi.name ?? "",
+            specimenKind: SpecimenMapping.kind(for: viewModel.arrivalResult?.poi.category ?? .park),
+            variant: SpecimenMapping.variant(for: viewModel.context?.weather ?? .clear)
+        )
+        .onChange(of: viewModel.arrivalResult) { _, result in
+            if (result?.tiersGained ?? 0) > 0 { showReward = true }
         }
     }
 

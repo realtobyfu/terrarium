@@ -81,6 +81,9 @@ final class DriftViewModel {
     /// Points earned during the current session (cells + collected spots).
     private(set) var pointsThisSession: Int = 0
 
+    /// Garden tiers gained this session (drives the summary's "garden grew" beat).
+    private(set) var tiersGainedThisSession: Int = 0
+
     /// Points per brand-new cell, and the jackpot for collecting a bonus spot.
     static let cellPoints = 2
     static let spotPoints = 25
@@ -153,6 +156,7 @@ final class DriftViewModel {
         routeWaypoints = nil
         pointSpots     = []
         pointsThisSession = 0
+        tiersGainedThisSession = 0
 
         // Scatter bonus spots near where the walk begins (falls back to SF if
         // location is unavailable). Computed once per session, stable thereafter.
@@ -305,7 +309,9 @@ final class DriftViewModel {
             }
             if earned > 0 {
                 pointsThisSession += earned
-                worldStore?.awardPoints(earned)
+                if let award = worldStore?.awardPoints(earned) {
+                    tiersGainedThisSession += award.tiersGained
+                }
             }
         }
     }

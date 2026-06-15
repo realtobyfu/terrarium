@@ -16,9 +16,12 @@ struct HomeView: View {
             // 1. Sky
             SkyLayer(state: viewModel.sky)
 
-            // 2. World (3D globe)
+            // 2. World (3D globe). Keyed on a world signature so it rebuilds when
+            // the garden grows (new props) or lushens (vitality), since WorldView
+            // only builds its entities once.
             WorldView(world: viewModel.world, sky: viewModel.sky,
                       onTapSpecimen: { viewModel.openSpecimen(propID: $0) })
+                .id(viewModel.globeSignature)
                 .ignoresSafeArea()
 
             // 3. Bottom reward surface (garden progress).
@@ -51,17 +54,6 @@ struct HomeView: View {
         // 4. Presentation
         .sheet(item: $viewModel.activeSheet) { sheet in
             switch sheet {
-            case .questDetail(let quest):
-                QuestDetailView(
-                    quest: quest,
-                    onComplete: { Task { await viewModel.completeQuest(quest) } }
-                )
-            case .journal(let quest):
-                JournalView(
-                    quest: quest,
-                    onSave: { viewModel.saveReflection(for: quest, text: $0) },
-                    onOpenGrowthLog: viewModel.openGrowthLog
-                )
             case .growthLog:
                 GrowthLogView()
             case .specimenJournal(let propID):
@@ -99,7 +91,6 @@ private extension Weather {
 #Preview {
     HomeView(viewModel: HomeViewModel(
         sky: StubSkyStateProvider(),
-        world: StubWorldStateProvider(),
-        quests: StubQuestSuggester()
+        world: StubWorldStateProvider()
     ))
 }

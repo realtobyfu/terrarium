@@ -15,7 +15,6 @@ import SwiftData
 final class AppContainer {
     let skyProvider: SkyStateProviding
     let worldProvider: WorldStateProviding
-    let questSuggester: QuestSuggesting
     let modelContainer: ModelContainer?
 
     // MARK: Explore providers (Stream H contract; stubs until Wave 1 lands)
@@ -32,7 +31,6 @@ final class AppContainer {
 
     init(
         sky: SkyStateProviding = SolarSkyStateProvider(),
-        quests: QuestSuggesting = StubQuestSuggester(),
         catalog: POICatalogProviding = StubPOICatalog(),
         weather: WeatherProviding = StubWeatherProvider(),
         location: LocationSessionProviding = StubLocationSession(),
@@ -42,7 +40,6 @@ final class AppContainer {
         inMemory: Bool = false
     ) {
         self.skyProvider = sky
-        self.questSuggester = quests
         self.poiCatalog = catalog
         self.weatherProvider = weather
         self.locationSession = location
@@ -93,7 +90,7 @@ final class AppContainer {
     var worldStore: WorldStore? { worldProvider as? WorldStore }
 
     func makeHomeViewModel() -> HomeViewModel {
-        let vm = HomeViewModel(sky: skyProvider, world: worldProvider, quests: questSuggester)
+        let vm = HomeViewModel(sky: skyProvider, world: worldProvider)
         vm.worldStore = worldStore
         return vm
     }

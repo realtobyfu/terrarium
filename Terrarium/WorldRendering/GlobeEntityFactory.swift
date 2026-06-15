@@ -52,7 +52,7 @@ enum GlobeEntityFactory {
     private static func makeSurface(vitality: Double) -> ModelEntity {
         let surface = ModelEntity(
             mesh: .generateSphere(radius: globeRadius),
-            materials: [surfaceMaterial()]
+            materials: [surfaceMaterial(vitality: vitality)]
         )
         surface.name = surfaceName
         return surface
@@ -82,12 +82,18 @@ enum GlobeEntityFactory {
 
     // MARK: - Materials
 
-    private static func surfaceMaterial() -> Material {
+    private static func surfaceMaterial(vitality: Double = 0.6) -> Material {
         if let texture = GlobeTextureFactory.surface {
             var material = PhysicallyBasedMaterial()
             material.baseColor = .init(tint: .white, texture: .init(texture))
             material.roughness = 0.75
             material.metallic = 0.0
+            // Lushness: a faint living glow that grows with vitality (points), so a
+            // well-explored world reads as more alive. Kept subtle so oceans don't
+            // wash out. (Reflected at globe (re)build; rebuilds when WorldState changes.)
+            let glow = UIColor(red: 0.50, green: 0.82, blue: 0.62, alpha: 1)
+            material.emissiveColor = .init(color: glow)
+            material.emissiveIntensity = Float(max(0, min(1, vitality))) * 0.35
             return material
         }
         // Fallback: flat ocean tint if texture generation failed.

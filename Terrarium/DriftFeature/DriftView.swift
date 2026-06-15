@@ -54,6 +54,7 @@ struct DriftView: View {
             if let summary = viewModel.summary {
                 DriftSummaryCard(
                     summary: summary,
+                    tiersGained: viewModel.tiersGainedThisSession,
                     onViewGlobe: {
                         showSummary = false
                         navSelection = .garden
@@ -262,6 +263,7 @@ struct DriftBackground: View {
 /// globe" affordance. Presented as a sheet over the cool base.
 private struct DriftSummaryCard: View {
     let summary: RambleSummary
+    var tiersGained: Int = 0
     let onViewGlobe: () -> Void
     let onDone: () -> Void
 
@@ -281,6 +283,18 @@ private struct DriftSummaryCard: View {
                     Text("Ramble complete")
                         .font(Theme.Typography.display(26, weight: .bold))
                         .foregroundStyle(Theme.Palette.title)
+
+                    if tiersGained > 0 {
+                        Label(tiersGained == 1 ? "Your garden grew a level!"
+                                               : "Your garden grew \(tiersGained) levels!",
+                              systemImage: "leaf.fill")
+                            .font(Theme.Typography.body(15, weight: .semibold))
+                            .foregroundStyle(Theme.Garden.moss)
+                            .padding(.horizontal, Theme.Spacing.m)
+                            .padding(.vertical, Theme.Spacing.s)
+                            .glassEffect(.regular.tint(Theme.Garden.leaf.opacity(0.22)), in: .capsule)
+                            .symbolEffect(.bounce, value: appeared)
+                    }
                 }
 
                 HStack(spacing: Theme.Spacing.m) {
