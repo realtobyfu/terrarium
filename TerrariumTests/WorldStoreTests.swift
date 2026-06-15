@@ -159,4 +159,58 @@ struct WorldStoreTests {
         #expect(entry?.propID == prop.id)
         #expect(store.current().vitality > vitalityBefore)
     }
+
+    // MARK: - Points → globe growth
+
+    @Test("Awarding points below a tier does not grow the globe")
+    func awardPointsBelowTierNoGrowth() {
+        let store = freshStore()
+        let before = store.current().props.count
+        let award = store.awardPoints(50)
+        #expect(award.total == 50)
+        #expect(award.tiersGained == 0)
+        #expect(store.totalPoints() == 50)
+        #expect(store.current().props.count == before)   // no specimen
+    }
+
+    @Test("Crossing point tiers grows the globe one specimen per tier")
+    func awardPointsCrossesTierGrowsGlobe() {
+        let store = freshStore()
+        let before = store.current().props.count
+
+        let a1 = store.awardPoints(100)            // → tier 1
+        #expect(a1.total == 100)
+        #expect(a1.tiersGained == 1)
+        #expect(store.current().props.count == before + 1)
+
+        let a2 = store.awardPoints(250)            // total 350 → tiers 2 & 3
+        #expect(a2.total == 350)
+        #expect(a2.tiersGained == 2)
+        #expect(store.current().props.count == before + 3)
+        #expect(store.totalPoints() == 350)
+    }
+
+    @Test("Vitality follows points (lushness), capped at 1")
+    func vitalityFollowsPoints() {
+        let store = freshStore()
+        store.awardPoints(1000)
+        #expect(store.current().vitality == 1.0)
+        #expect(WorldStore.vitality(forPoints: 0) < WorldStore.vitality(forPoints: 400))
+    }
+
+    @Test("logDiscovery records a standalone journal entry (no specimen)")
+    func logDiscoveryStandsAlone() {
+        let store = freshStore()
+        let before = store.current().props.count
+
+        store.logDiscovery(text: "Found a quiet park.", placeName: "Dolores Park",
+                           kind: .tree, variant: "foggy")
+
+        #expect(store.current().props.count == before)   // no globe prop
+        let entries = store.allJournalEntries()
+        #expect(entries.count == 1)
+        #expect(entries.first?.placeName == "Dolores Park")
+        #expect(entries.first?.kind == .tree)
+        #expect(entries.first?.variant == "foggy")
+    }
 }
