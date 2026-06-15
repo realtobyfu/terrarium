@@ -147,8 +147,8 @@ struct AnchorViewModelTests {
         #expect(pick.poiRef == "poi.a")
     }
 
-    @Test("Arrival awards a specimen and records a discovery")
-    func arrivalAwardsSpecimenAndRecordsDiscovery() async throws {
+    @Test("Arrival awards points and records a discovery")
+    func arrivalAwardsPointsAndRecordsDiscovery() async throws {
         let poi = makePOI(ref: "poi.ocean-beach.sf", kind: .tree)
         let catalog = FixtureCatalog(pois: [poi])
         let discoveryStore = InMemoryDiscoveryStore()
@@ -164,12 +164,12 @@ struct AnchorViewModelTests {
         vm.worldStore = worldStore
 
         await vm.refresh()
-        let propsBefore = worldStore.current().props.count
+        let pointsBefore = worldStore.totalPoints()
 
         await vm.arrive()
 
-        // Specimen grew
-        #expect(worldStore.current().props.count == propsBefore + 1)
+        // Points awarded (no per-discovery specimen — grow-a-tree is cut)
+        #expect(worldStore.totalPoints() == pointsBefore + AnchorViewModel.arrivalPoints)
 
         // Discovery was recorded
         #expect(!discoveryStore.exploredRefs().isEmpty)
@@ -178,10 +178,10 @@ struct AnchorViewModelTests {
         // ArrivalResult is set
         let result = try #require(vm.arrivalResult)
         #expect(result.poi.poiRef == "poi.ocean-beach.sf")
-        #expect(result.specimenGrown == true)
+        #expect(result.pointsEarned == AnchorViewModel.arrivalPoints)
     }
 
-    @Test("Arrival is idempotent for the same POI")
+    @Test("Arrival is idempotent for the same POI (no double points)")
     func arrivalIsIdempotent() async throws {
         let poi = makePOI(ref: "poi.idempotent.test", kind: .building)
         let catalog = FixtureCatalog(pois: [poi])
@@ -199,11 +199,11 @@ struct AnchorViewModelTests {
 
         await vm.refresh()
         await vm.arrive()
-        let countAfterFirst = worldStore.current().props.count
+        let pointsAfterFirst = worldStore.totalPoints()
 
-        // Second arrive on same pick should NOT add another specimen
+        // Second arrive on the same pick should NOT award more points
         await vm.arrive()
-        #expect(worldStore.current().props.count == countAfterFirst)
+        #expect(worldStore.totalPoints() == pointsAfterFirst)
     }
 
     @Test("Empty catalog yields no pick")

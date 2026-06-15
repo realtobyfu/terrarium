@@ -186,16 +186,14 @@ final class AnchorViewModel {
             weather: .clear, now: .now, preferences: preferences
         )
 
-        // Derive the specimen variant from the weather context (US-F2).
-        let specimenVariant = SpecimenMapping.variant(for: ctx.weather)
-
-        // Build quest from POI — use SpecimenMapping.kind so the mapping is
-        // consistent even if the POI's stored specimenKind drifts (FR-21).
+        // Cosmetic kind/variant for the decoupled journal art.
+        let variant = SpecimenMapping.variant(for: ctx.weather)
         let mappedKind = SpecimenMapping.kind(for: poi.category)
+
+        // Verify presence before rewarding: honor-mode is always true; a real
+        // LocationVerifier (Stream F) gates on proximity. We build a minimal quest
+        // purely so the verifier can resolve the POI coordinate.
         let quest = Quest(
-            // Stable id derived from the poiRef so re-arriving the same place is
-            // idempotent — WorldStore keys dedup on quest.id (FR-16). A fresh
-            // UUID here would grow a duplicate specimen on every tap.
             id: Self.stableQuestID(for: poi.poiRef),
             title: "Arrived at \(poi.name)",
             prompt: "You made it to \(poi.name).",
@@ -203,28 +201,21 @@ final class AnchorViewModel {
             poiRef: poi.poiRef,
             suggestedKind: mappedKind
         )
+        let verified = await arrivalVerifier.verify(quest)
 
-        // Award via WorldStore (grows specimen at POI placement coordinate).
-        var specimenGrown = false
-        if let store = worldStore {
-            let prop = await store.complete(quest: quest, with: arrivalVerifier,
-                                            variant: specimenVariant)
-            if let prop = prop {
-                specimenGrown = true
-                // US-F3: write a journal entry so tapping the specimen shows
-                // the discovery. Text uses the place name as the seed; the user
-                // can overwrite it from the journal sheet.
-                store.addJournal(
-                    to: prop,
-                    questId: quest.id,
-                    text: "Discovered \(poi.name).",
-                    placeName: poi.name
-                )
-            }
+        // Reward the FIRST verified arrival at a place with points (idempotent —
+        // re-arriving the same POI doesn't re-award). Points drive globe growth;
+        // no per-discovery specimen is grown (that's the cut "grow a tree").
+        let alreadyVisited = discoveries.exploredRefs().contains(poi.poiRef)
+        var award = PointsAward(total: worldStore?.totalPoints() ?? 0, added: 0, tiersGained: 0)
+        if verified, !alreadyVisited, let store = worldStore {
+            award = store.awardPoints(Self.arrivalPoints)
+            // Decoupled discovery journal entry (no globe prop).
+            store.logDiscovery(text: "Discovered \(poi.name).", placeName: poi.name,
+                               kind: mappedKind, variant: variant)
         }
 
-        // Record discovery regardless of whether a specimen was awarded
-        // (could be idempotent / already completed).
+        // Record the discovery (also backs the idempotency check above).
         let discovery = Discovery(
             target: .poi(poiRef: poi.poiRef),
             context: DiscoveryContext(weather: ctx.weather, timeOfDay: ctx.timeOfDay)
@@ -233,10 +224,14 @@ final class AnchorViewModel {
 
         arrivalResult = ArrivalResult(
             poi: poi,
-            specimenGrown: specimenGrown,
+            pointsEarned: award.added,
+            tiersGained: award.tiersGained,
             discovery: discovery
         )
     }
+
+    /// Points granted for a (first, verified) Anchor arrival.
+    static let arrivalPoints = 40
 
     /// A deterministic UUID derived from a POI reference (FNV-1a over two seeds),
     /// so arriving at the same place always produces the same quest id and
@@ -357,6 +352,9 @@ struct WalkInfo: Equatable {
 /// The outcome of tapping "I'm here".
 struct ArrivalResult: Equatable {
     let poi: POI
-    let specimenGrown: Bool
+    /// Points awarded by this arrival (0 if unverified or already visited).
+    let pointsEarned: Int
+    /// Globe tiers gained from this arrival's points (drives the reward beat).
+    let tiersGained: Int
     let discovery: Discovery
 }

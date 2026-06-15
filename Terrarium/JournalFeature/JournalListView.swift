@@ -43,24 +43,22 @@ struct JournalDiscovery: Identifiable, Equatable {
 
 extension JournalDiscovery {
     /// Builds the full list of journaled discoveries from a `WorldStore`, newest
-    /// first, using only its existing public read APIs (no domain changes).
+    /// first. Reads decoupled journal entries directly — entries stand alone now,
+    /// no longer tied to a globe specimen.
     @MainActor
     static func all(from store: WorldStore) -> [JournalDiscovery] {
-        store.current().props
-            .compactMap { prop -> JournalDiscovery? in
-                guard let entry = store.journalEntry(forPropID: prop.id) else { return nil }
-                return JournalDiscovery(
-                    id: prop.id,
-                    kind: prop.kind,
-                    variant: prop.variant,
-                    placeName: entry.placeName,
-                    date: entry.date,
-                    text: entry.text,
-                    hasPhoto: entry.photoRef != nil,
-                    poiRef: store.prop(withID: prop.id)?.poiRef
-                )
-            }
-            .sorted { $0.date > $1.date }
+        store.allJournalEntries().map { entry in
+            JournalDiscovery(
+                id: entry.id,
+                kind: entry.kind,
+                variant: entry.variant,
+                placeName: entry.placeName,
+                date: entry.date,
+                text: entry.text,
+                hasPhoto: entry.photoRef != nil,
+                poiRef: nil
+            )
+        }
     }
 }
 
@@ -148,16 +146,14 @@ struct JournalListView: View {
 }
 
 extension JournalListView {
-    /// Live, `WorldStore`-backed journal. Saving an edited reflection appends a
-    /// note via the existing `addJournal` API (no domain change).
+    /// Live, `WorldStore`-backed journal. Editing a reflection updates the
+    /// standalone entry in place (entries are decoupled from globe specimens).
     @MainActor
     init(store: WorldStore) {
         self.init(
             discoveries: JournalDiscovery.all(from: store),
             onSaveReflection: { discovery, text in
-                guard let prop = store.prop(withID: discovery.id) else { return }
-                store.addJournal(to: prop, questId: UUID(), text: text,
-                                 placeName: discovery.placeName)
+                store.updateJournal(entryID: discovery.id, text: text)
             }
         )
     }

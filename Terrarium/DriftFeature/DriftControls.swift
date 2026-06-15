@@ -37,6 +37,7 @@ struct DriftStatStrip: View {
     let elapsedSeconds: TimeInterval
     let distanceMeters: Double
     let cellsLit: Int
+    var points: Int = 0
 
     var body: some View {
         HStack(spacing: 0) {
@@ -45,6 +46,8 @@ struct DriftStatStrip: View {
             stat(icon: "figure.walk", value: distanceText, label: "Distance")
             divider
             stat(icon: "circle.grid.2x2.fill", value: "\(cellsLit)", label: "Lit")
+            divider
+            stat(icon: "star.fill", value: "\(points)", label: "Points")
         }
         .padding(.vertical, Theme.Spacing.m)
         .padding(.horizontal, Theme.Spacing.l)

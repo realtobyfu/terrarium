@@ -11,6 +11,13 @@ import Foundation
 import SwiftData
 import simd
 
+/// The outcome of awarding exploration points (drives the reward beat).
+struct PointsAward: Equatable {
+    let total: Int
+    let added: Int
+    let tiersGained: Int
+}
+
 @MainActor
 final class WorldStore: WorldStateProviding {
 
@@ -114,6 +121,85 @@ final class WorldStore: WorldStateProviding {
 
     func prop(withID id: UUID) -> WorldPropRecord? {
         try? fetchProp(id: id)
+    }
+
+    // MARK: - Points → globe growth (Explore reward)
+
+    /// Points awarded per discovery / per crossed tier behaviour.
+    private let pointsPerTier = 100
+    /// Kinds cycled through as the garden levels up.
+    private static let tierKinds: [WorldProp.Kind] = [.flowers, .tree, .building]
+
+    /// Running exploration-points total.
+    func totalPoints() -> Int { (try? fetchRecord())?.points ?? 0 }
+
+    /// Add exploration points. Raises derived vitality and, when the total crosses
+    /// `pointsPerTier` boundaries, grows the globe by one garden specimen per tier
+    /// gained (deterministically placed). Returns what happened so the UI can show
+    /// the reward beat. Awarding 0 (or with no world record) is a no-op.
+    @discardableResult
+    func awardPoints(_ amount: Int) -> PointsAward {
+        guard amount > 0, let world = try? fetchRecord() else {
+            return PointsAward(total: totalPoints(), added: 0, tiersGained: 0)
+        }
+        let oldTotal = world.points
+        let oldTier  = oldTotal / pointsPerTier
+        world.points = oldTotal + amount
+        let newTier  = world.points / pointsPerTier
+
+        if newTier > oldTier {
+            for tier in (oldTier + 1)...newTier {
+                let kind = Self.tierKinds[(tier - 1) % Self.tierKinds.count]
+                let prop = WorldPropRecord(
+                    kind: kind,
+                    coordinate: POIPlacement.sphereCoordinate(forPOIRef: "tier.\(tier)"),
+                    poiRef: "tier.\(tier)",
+                    variant: "clear"
+                )
+                context.insert(prop)
+            }
+        }
+
+        // Vitality follows points (lushness), never decreases.
+        world.vitality = max(world.vitality, Self.vitality(forPoints: world.points))
+        try? context.save()
+        return PointsAward(total: world.points, added: amount, tiersGained: newTier - oldTier)
+    }
+
+    /// Map a points total to a 0...1 lushness/glow value for the globe.
+    static func vitality(forPoints points: Int) -> Double {
+        min(1.0, 0.45 + Double(points) / 800.0 * 0.55)
+    }
+
+    // MARK: - Decoupled discovery journal (Explore)
+
+    /// Record a standalone discovery journal entry (no globe specimen). Backs the
+    /// JournalList's "field notes". `propID` is a fresh id — the entry stands alone.
+    @discardableResult
+    func logDiscovery(text: String, placeName: String,
+                      kind: WorldProp.Kind = .flowers, variant: String = "clear",
+                      photoRef: String? = nil) -> JournalEntry {
+        let entry = JournalEntry(questId: UUID(), propID: UUID(), text: text,
+                                 photoRef: photoRef, placeName: placeName,
+                                 kind: kind, variant: variant)
+        context.insert(entry)
+        try? context.save()
+        return entry
+    }
+
+    /// All journal entries, newest first — the JournalList data source.
+    func allJournalEntries() -> [JournalEntry] {
+        let all = (try? context.fetch(FetchDescriptor<JournalEntry>())) ?? []
+        return all.sorted { $0.date > $1.date }
+    }
+
+    /// Edit an existing entry's reflection text (the JournalList detail editor).
+    func updateJournal(entryID: UUID, text: String) {
+        guard let entry = try? context.fetch(
+            FetchDescriptor<JournalEntry>(predicate: #Predicate { $0.id == entryID })
+        ).first else { return }
+        entry.text = text
+        try? context.save()
     }
 
     // MARK: - Fetching

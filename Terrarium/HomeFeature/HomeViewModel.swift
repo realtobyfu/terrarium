@@ -42,6 +42,12 @@ final class HomeViewModel {
     private(set) var suggestedQuest: Quest
     var activeSheet: HomeSheet?
 
+    /// Exploration points total — drives the garden-progress surface. Refreshed
+    /// when the Home tab appears (Explore awards points on other tabs).
+    private(set) var points: Int = 0
+    /// Points needed per garden tier (mirrors WorldStore).
+    let pointsPerTier = 100
+
     /// Persistent store, when available — drives completion + journaling.
     var worldStore: WorldStore?
     /// The specimen most recently grown, so the journal sheet can attach to it.
@@ -58,6 +64,22 @@ final class HomeViewModel {
         self.world = world.current()
         self.suggestedQuest = quests.suggestion()
     }
+
+    // MARK: - Garden progress
+
+    /// Re-read the world + points (call when the Home tab becomes visible, since
+    /// points are awarded from the Drift/Anchor tabs while Home stays alive).
+    func refresh() {
+        world = worldProvider.current()
+        points = worldStore?.totalPoints() ?? 0
+    }
+
+    /// Current garden tier and progress (0...1) toward the next.
+    var tier: Int { points / pointsPerTier }
+    var tierProgress: Double {
+        Double(points % pointsPerTier) / Double(pointsPerTier)
+    }
+    var pointsToNextTier: Int { pointsPerTier - (points % pointsPerTier) }
 
     // MARK: - Navigation
 

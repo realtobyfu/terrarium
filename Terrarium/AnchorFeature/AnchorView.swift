@@ -71,7 +71,8 @@ struct AnchorView: View {
                     } else if let result = viewModel.arrivalResult {
                         ArrivalCard(
                             placeName: result.poi.name,
-                            grew: result.specimenGrown,
+                            pointsEarned: result.pointsEarned,
+                            tiersGained: result.tiersGained,
                             onAnother: { Task { await viewModel.refresh() } }
                         )
                     } else if let poi = viewModel.pick {
@@ -201,28 +202,35 @@ struct AnchorView: View {
 
 // MARK: - State cards
 
-/// Celebratory arrival confirmation (US-D2) styled as a glass island.
+/// Celebratory arrival confirmation (US-D2) styled as a glass island. Frames the
+/// reward as points earned (and a garden tier-up when one is crossed).
 private struct ArrivalCard: View {
     let placeName: String
-    let grew: Bool
+    let pointsEarned: Int
+    let tiersGained: Int
     let onAnother: () -> Void
+
+    private var grewTier: Bool { tiersGained > 0 }
+    private var earned: Bool { pointsEarned > 0 }
 
     var body: some View {
         VStack(spacing: Theme.Spacing.xl) {
             VStack(spacing: Theme.Spacing.l) {
-                Image(systemName: grew ? "leaf.circle.fill" : "checkmark.circle.fill")
+                Image(systemName: grewTier ? "leaf.circle.fill" : (earned ? "star.circle.fill" : "checkmark.circle.fill"))
                     .font(.system(size: 56))
                     .foregroundStyle(Theme.Garden.moss)
-                    .symbolEffect(.bounce, value: grew)
+                    .symbolEffect(.bounce, value: pointsEarned)
 
-                Text(grew ? "Your terrarium grew!" : "Arrival recorded")
+                Text(grewTier ? "Your garden grew!" : (earned ? "+\(pointsEarned) points" : "You're here"))
                     .font(Theme.Typography.display(24, weight: .bold))
                     .foregroundStyle(Theme.Palette.title)
                     .multilineTextAlignment(.center)
 
-                Text(grew
-                     ? "A new specimen has sprouted at \(placeName). Tap the globe to visit it."
-                     : "You've been to \(placeName). Discovery logged.")
+                Text(grewTier
+                     ? "\(placeName) pushed your garden to a new level. Tap the globe to see it grow."
+                     : (earned
+                        ? "Nice find at \(placeName). Keep exploring to grow your garden."
+                        : "You've already been to \(placeName)."))
                     .font(Theme.Typography.body(15))
                     .foregroundStyle(Theme.Palette.secondary)
                     .multilineTextAlignment(.center)
@@ -394,11 +402,11 @@ private func makePreviewVM(weather: WeatherProviding, location: LocationSessionP
     ))
 }
 
-#Preview("Arrival — specimen grew") {
+#Preview("Arrival — garden grew") {
     ZStack {
         LinearGradient(colors: [Color(hex: "F2E8D2"), Color(hex: "FBF2E0")],
                        startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-        ArrivalCard(placeName: "Dolores Park", grew: true, onAnother: {})
+        ArrivalCard(placeName: "Dolores Park", pointsEarned: 40, tiersGained: 1, onAnother: {})
             .padding()
     }
 }

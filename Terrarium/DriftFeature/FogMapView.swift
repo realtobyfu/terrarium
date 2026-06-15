@@ -1,23 +1,21 @@
 //
 //  FogMapView.swift
-//  Terrarium — Prototypes
+//  Terrarium — DriftFeature
 //
-//  The fog-of-war map for the Liquid-Glass Drift redesign. Restyles a SwiftUI
-//  `Map` to feel "terrarium": the standard map is muted by a cool wash, fog
-//  closes in at the periphery (a radial vignette — the "fog of war" atmosphere),
-//  and the cells you've lit are drawn as soft glowing tiles on top.
+//  The fog-of-war map for the Drift redesign. A real fog mask: the whole map is
+//  blanketed in a cool fog, and the cells you've lit *carve feathered clearings*
+//  out of it (a `Canvas` over a `MapReader`, erasing holes at each explored cell's
+//  projected screen point with `.destinationOut`). New-this-session cells clear a
+//  larger, brighter window than older ones — so the world genuinely "opens up" as
+//  you walk, instead of a static vignette.
 //
-//  Two cell tiers are rendered distinctly (a11y: distinguished by brightness +
-//  stroke weight, never hue alone):
-//    • previously explored cells → faint cool haze tiles
-//    • cells lit this session     → bright mint tiles with a leaf stroke
+//  On top: the walked breadcrumb trail, an optional suggested loop, the user
+//  location, and collectible **point spots** (glinting bonuses; a check once
+//  collected). Cells are precision-7 geohash ids (decoded to centers/boxes via
+//  `GeohashCell`). It's a prototype — a convincing fog reveal matters more than
+//  exact geohash geometry.
 //
-//  Cells are precision-7 geohash ids; we decode each to its bounding box
-//  (`GeohashCell.bounds`) and render a polygon. The breadcrumb trail and the
-//  suggested loop are drawn as polylines. It's a prototype — a convincing fog /
-//  lit-cell look matters more than exact geohash geometry.
-//
-//  Min target iOS 26: the Map content builder + map styling APIs are used directly.
+//  Min target iOS 26: MapReader + MapProxy.convert + the Map content builder.
 //
 
 import SwiftUI
@@ -34,80 +32,83 @@ struct FogMapView: View {
     var breadcrumbs: [Coordinate] = []
     /// Suggested loop (US-E3), drawn as a dashed line when present.
     var routeWaypoints: [Coordinate]? = nil
+    /// Bonus point spots to collect (glint when open, check when collected).
+    var pointSpots: [PointSpot] = []
 
     @Binding var position: MapCameraPosition
     var showsUserLocation: Bool = true
 
     var body: some View {
-        Map(position: $position) {
-            // Previously explored cells — faint, cool, recede into the fog.
-            ForEach(oldCells, id: \.self) { id in
-                if let b = GeohashCell.bounds(id) {
-                    MapPolygon(coordinates: Self.corners(of: b))
-                        .foregroundStyle(Theme.Garden.haze.opacity(0.20))
-                        .stroke(Theme.Garden.mist.opacity(0.35), lineWidth: 0.5)
+        MapReader { proxy in
+            Map(position: $position) {
+                // New-this-session cells get a bright tinted fill on top of the
+                // cleared fog, so the freshest discoveries pop.
+                ForEach(newCells.sorted(), id: \.self) { id in
+                    if let b = GeohashCell.bounds(id) {
+                        MapPolygon(coordinates: Self.corners(of: b))
+                            .foregroundStyle(Theme.Garden.mint.opacity(0.45))
+                            .stroke(Theme.Garden.leaf, lineWidth: 1.5)
+                    }
                 }
-            }
 
-            // Cells lit this session — bright, glowing, "freshly revealed".
-            ForEach(newCells.sorted(), id: \.self) { id in
-                if let b = GeohashCell.bounds(id) {
-                    MapPolygon(coordinates: Self.corners(of: b))
-                        .foregroundStyle(Theme.Garden.mint.opacity(0.55))
-                        .stroke(Theme.Garden.leaf, lineWidth: 1.5)
+                // The path walked this session.
+                if breadcrumbs.count > 1 {
+                    MapPolyline(coordinates: breadcrumbs.map(\.cl))
+                        .stroke(Theme.Garden.leaf,
+                                style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
                 }
-            }
 
-            // The path walked this session.
-            if breadcrumbs.count > 1 {
-                MapPolyline(coordinates: breadcrumbs.map(\.cl))
-                    .stroke(
-                        Theme.Garden.leaf,
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
-                    )
-            }
+                // Suggested loop (idle preview / route shaping).
+                if let waypoints = routeWaypoints, waypoints.count > 1 {
+                    MapPolyline(coordinates: waypoints.map(\.cl))
+                        .stroke(Theme.Garden.pine.opacity(0.85),
+                                style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [9, 7]))
+                }
 
-            // The suggested loop (idle preview / route shaping).
-            if let waypoints = routeWaypoints, waypoints.count > 1 {
-                MapPolyline(coordinates: waypoints.map(\.cl))
-                    .stroke(
-                        Theme.Garden.pine.opacity(0.85),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [9, 7])
-                    )
-            }
+                // Collectible bonus spots.
+                ForEach(pointSpots) { spot in
+                    Annotation("Bonus spot", coordinate: spot.coordinate.cl) {
+                        PointSpotMarker(collected: spot.collected)
+                    }
+                    .annotationTitles(.hidden)
+                }
 
-            if showsUserLocation {
-                UserAnnotation()
+                if showsUserLocation { UserAnnotation() }
             }
+            .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+            .tint(Theme.Garden.pine)
+            // The fog mask sits above the map, carved open at explored cells.
+            .overlay { fogMask(proxy: proxy) }
         }
-        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
-        .tint(Theme.Garden.pine)
-        .overlay { fogOverlay }
     }
 
-    /// Old cells only (so the bright new tier never double-draws under the faint one).
-    private var oldCells: [String] {
-        exploredCells.subtracting(newCells).sorted()
-    }
+    // MARK: Fog mask
 
-    /// The fog: a subtle cool mute over the whole map plus a vignette that closes
-    /// in at the edges. Scales to the view, so it reads right in both the idle
-    /// card preview and the full-screen active map.
-    private var fogOverlay: some View {
-        GeometryReader { geo in
-            let maxDim = max(geo.size.width, geo.size.height)
-            ZStack {
-                Theme.Garden.mist.opacity(0.10)
-                    .blendMode(.softLight)
-                RadialGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: .clear, location: 0.0),
-                        .init(color: .clear, location: 0.45),
-                        .init(color: Theme.Garden.dusk.opacity(0.42), location: 1.0),
-                    ]),
-                    center: .center,
-                    startRadius: maxDim * 0.12,
-                    endRadius: maxDim * 0.72
+    /// Blankets the map in fog, then erases feathered holes at every explored
+    /// cell's projected point. New cells clear wider/brighter than old ones.
+    private func fogMask(proxy: MapProxy) -> some View {
+        Canvas { context, size in
+            // 1. Lay down the fog over the whole map.
+            context.fill(
+                Path(CGRect(origin: .zero, size: size)),
+                with: .color(Theme.Garden.dusk.opacity(0.55))
+            )
+            // 2. Punch feathered clearings at each explored cell.
+            context.blendMode = .destinationOut
+            for id in exploredCells {
+                guard let center = GeohashCell.decode(id),
+                      let p = proxy.convert(center.cl, to: .local) else { continue }
+                let isNew = newCells.contains(id)
+                let r: CGFloat = isNew ? 58 : 40
+                let core: CGFloat = isNew ? 0.95 : 0.8
+                let gradient = Gradient(stops: [
+                    .init(color: .black.opacity(core), location: 0),
+                    .init(color: .black.opacity(core * 0.7), location: 0.55),
+                    .init(color: .black.opacity(0), location: 1),
+                ])
+                context.fill(
+                    Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
+                    with: .radialGradient(gradient, center: p, startRadius: 0, endRadius: r)
                 )
             }
         }
@@ -125,6 +126,34 @@ struct FogMapView: View {
     }
 }
 
+// MARK: - PointSpotMarker
+
+/// A glinting bonus marker — pulses while open, settles to a check once collected.
+/// State is conveyed with icon + shape, never hue alone (a11y).
+private struct PointSpotMarker: View {
+    let collected: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(collected ? Theme.Garden.pine.opacity(0.9) : Theme.Garden.bloom)
+                .frame(width: 30, height: 30)
+                .overlay(Circle().strokeBorder(.white.opacity(0.8), lineWidth: 2))
+                .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+            Image(systemName: collected ? "checkmark" : "sparkles")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+        }
+        .scaleEffect(collected ? 1.0 : (pulse ? 1.12 : 0.96))
+        .animation(reduceMotion || collected ? nil
+                   : .easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulse)
+        .onAppear { pulse = true }
+        .accessibilityLabel(collected ? "Bonus spot collected" : "Uncollected bonus spot")
+    }
+}
+
 // MARK: - Coordinate bridging
 
 extension Coordinate {
@@ -136,7 +165,7 @@ extension Coordinate {
 
 // MARK: - Preview
 
-#Preview("FogMapView — lit cells") {
+#Preview("FogMapView — lit cells + spots") {
     FogMapPreviewHarness()
 }
 
@@ -162,11 +191,13 @@ private struct FogMapPreviewHarness: View {
             GeohashCell.encode(Coordinate(latitude: 37.7570, longitude: -122.4305), precision: 7),
             GeohashCell.encode(Coordinate(latitude: 37.7640, longitude: -122.4230), precision: 7),
         ])
+        let spots = PointSpotField.spots(near: Coordinate(latitude: 37.7596, longitude: -122.4269))
         return FogMapView(
             newCells: newCells,
             exploredCells: explored,
             breadcrumbs: Self.route,
             routeWaypoints: nil,
+            pointSpots: spots,
             position: $position
         )
         .ignoresSafeArea()

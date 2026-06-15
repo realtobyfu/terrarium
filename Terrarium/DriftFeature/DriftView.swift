@@ -139,6 +139,7 @@ struct DriftView: View {
             newCells: viewModel.newCells,
             exploredCells: viewModel.allExploredCells,
             routeWaypoints: viewModel.routeWaypoints,
+            pointSpots: viewModel.pointSpots,
             position: $mapPosition
         )
         .frame(minHeight: 200)
@@ -184,6 +185,7 @@ struct DriftView: View {
             exploredCells: viewModel.allExploredCells,
             breadcrumbs: viewModel.session?.breadcrumbs ?? [],
             routeWaypoints: viewModel.routeWaypoints,
+            pointSpots: viewModel.pointSpots,
             position: $mapPosition
         )
         .ignoresSafeArea()
@@ -193,7 +195,8 @@ struct DriftView: View {
                 DriftStatStrip(
                     elapsedSeconds: viewModel.elapsedSeconds,
                     distanceMeters: viewModel.distanceMeters,
-                    cellsLit: viewModel.newCells.count
+                    cellsLit: viewModel.newCells.count,
+                    points: viewModel.pointsThisSession
                 )
             }
             .padding(.horizontal, Theme.Spacing.l)

@@ -103,6 +103,11 @@ struct ExploreShellView: View {
                 .padding(.bottom, Theme.Spacing.s)
         }
         .ignoresSafeArea(.keyboard)
+        // Points are awarded on the Drift/Anchor tabs; refresh Home's garden
+        // progress when it becomes visible again.
+        .onChange(of: selectedTab) { _, tab in
+            if tab == .home { homeVM.refresh() }
+        }
     }
 
 }

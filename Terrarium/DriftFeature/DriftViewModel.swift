@@ -74,6 +74,17 @@ final class DriftViewModel {
     /// Target walk duration in minutes for route generation.
     var targetMinutes: Double = 30
 
+    /// Scattered bonus spots for this session — walk into one to collect points.
+    /// Computed near the walk's start; `collected` flips when its cell lights.
+    private(set) var pointSpots: [PointSpot] = []
+
+    /// Points earned during the current session (cells + collected spots).
+    private(set) var pointsThisSession: Int = 0
+
+    /// Points per brand-new cell, and the jackpot for collecting a bonus spot.
+    static let cellPoints = 2
+    static let spotPoints = 25
+
     // -------------------------------------------------------------------------
     // MARK: Injected dependencies
     // -------------------------------------------------------------------------
@@ -140,6 +151,19 @@ final class DriftViewModel {
         lastBreadcrumb = nil
         summary        = nil
         routeWaypoints = nil
+        pointSpots     = []
+        pointsThisSession = 0
+
+        // Scatter bonus spots near where the walk begins (falls back to SF if
+        // location is unavailable). Computed once per session, stable thereafter.
+        Task { [weak self] in
+            guard let self else { return }
+            let center = await self.location.currentCoordinate()
+                ?? Coordinate(latitude: 37.7596, longitude: -122.4269)
+            if self.pointSpots.isEmpty {
+                self.pointSpots = PointSpotField.spots(near: center)
+            }
+        }
 
         // Snapshot context at session start (weather/time — ideally injected
         // from a ContextAssembler in the container; default to clear/morning
@@ -264,7 +288,6 @@ final class DriftViewModel {
             newCells.insert(cellID)
             allExploredCells.insert(cellID)
 
-            let state: DiscoveryCell.State = alreadyExplored ? .explored : .newThisSession
             let discovery = Discovery(
                 target:    .cell(id: cellID),
                 timestamp: .now,
@@ -272,58 +295,18 @@ final class DriftViewModel {
             )
             discoveries.record(discovery)
 
-            // US-F2 / US-F3: grow a specimen for each brand-new cell
-            // (never seen before on any session). Re-explored cells don't grow
-            // a second specimen.
-            if !alreadyExplored, let store = worldStore {
-                growSpecimen(forCell: cellID, context: sessionContext, store: store)
+            // Award points: a trickle for a brand-new cell, a jackpot for walking
+            // into a bonus spot. Points drive globe growth (the per-cell "grow a
+            // tree" specimen is gone — see PointSpot / WorldStore.awardPoints).
+            var earned = alreadyExplored ? 0 : Self.cellPoints
+            if let idx = pointSpots.firstIndex(where: { !$0.collected && $0.cellID == cellID }) {
+                pointSpots[idx].collected = true
+                earned += Self.spotPoints
             }
-
-            // Used by DriftView for rendering distinction.
-            _ = state
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // MARK: Specimen growth (US-F2, US-F3)
-    // -------------------------------------------------------------------------
-
-    /// Grow a specimen for a brand-new Drift cell discovery.
-    ///
-    /// Cell discoveries don't have a POI reference, so we:
-    /// 1. Use `.other` category → `.flowers` kind (the "wandering" specimen).
-    /// 2. Derive the variant from the session context weather.
-    /// 3. Use the cell id as the `poiRef` so `POIPlacement` places it
-    ///    deterministically — the same cell always grows in the same globe spot.
-    /// 4. Write a journal entry (US-F3) with the cell id as the place name so
-    ///    the tap-a-specimen interaction surfaces some discovery text.
-    ///
-    /// The award uses `HonorVerifier` — there's no second location check for
-    /// Drift cells; the breadcrumb itself IS the verification.
-    private func growSpecimen(forCell cellID: String,
-                              context: DiscoveryContext,
-                              store: WorldStore) {
-        let variant = SpecimenMapping.variant(for: context.weather)
-        let kind    = SpecimenMapping.kind(for: .other)  // .flowers
-
-        // Reuse poiRef slot for the cell id so placement is deterministic.
-        let quest = Quest(
-            title:         "Explored \(cellID)",
-            prompt:        "You wandered through a new area.",
-            placeName:     "Cell \(cellID)",
-            poiRef:        cellID,
-            suggestedKind: kind
-        )
-
-        let prop = store.award(quest: quest, verifierKind: .honor, variant: variant)
-        if let prop = prop {
-            // US-F3: seed a discovery journal entry for this cell.
-            store.addJournal(
-                to:        prop,
-                questId:   quest.id,
-                text:      "Wandered into a new area.",
-                placeName: "Drift discovery"
-            )
+            if earned > 0 {
+                pointsThisSession += earned
+                worldStore?.awardPoints(earned)
+            }
         }
     }
 

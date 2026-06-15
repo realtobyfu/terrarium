@@ -220,8 +220,8 @@ struct AnchorArrivalJournalTests {
         return WorldStore(context: ctx)
     }
 
-    @Test("arrive() seeds a journal entry for the grown specimen")
-    func arriveSeesJournalEntryForSpecimen() async throws {
+    @Test("arrive() logs a decoupled discovery journal entry (no specimen)")
+    func arriveLogsDiscoveryJournalEntry() async throws {
         let poi = makePOI(ref: "poi.coffee.test", category: .coffee)
         let catalog = FixtureCatalog(pois: [poi])
         let worldStore = freshWorldStore()
@@ -235,25 +235,25 @@ struct AnchorArrivalJournalTests {
             discoveries: discoveryStore
         )
         vm.worldStore = worldStore
-        vm.arrivalVerifier = HonorVerifier()  // ensure award succeeds
+        vm.arrivalVerifier = HonorVerifier()  // ensure the award succeeds
 
+        let propsBefore = worldStore.current().props.count
         await vm.refresh()
         await vm.arrive()
 
-        // Specimen should have grown.
+        // Points awarded; no per-discovery specimen grown.
         let result = try #require(vm.arrivalResult)
-        #expect(result.specimenGrown == true)
+        #expect(result.pointsEarned == AnchorViewModel.arrivalPoints)
+        #expect(worldStore.current().props.count == propsBefore)
 
-        // Journal entry should exist.
-        let props = worldStore.current().props
-        let lastProp = try #require(props.last)
-        let entry = worldStore.journalEntry(forPropID: lastProp.id)
-        #expect(entry != nil)
-        #expect(entry?.placeName == poi.name)
+        // A standalone journal entry exists (fetched directly, not by prop).
+        let entries = worldStore.allJournalEntries()
+        #expect(entries.count == 1)
+        #expect(entries.first?.placeName == poi.name)
     }
 
-    @Test("arrive() with fog weather stores foggy variant on specimen")
-    func arriveWithFogStoresFoggyVariant() async throws {
+    @Test("arrive() with fog weather logs a foggy journal entry")
+    func arriveWithFogLogsFoggyVariant() async throws {
         let poi = makePOI(ref: "poi.fog.journal", category: .viewpoint)
         let catalog = FixtureCatalog(pois: [poi])
         let worldStore = freshWorldStore()
@@ -276,19 +276,14 @@ struct AnchorArrivalJournalTests {
         await vm.arrive()
 
         let result = try #require(vm.arrivalResult)
-        #expect(result.specimenGrown == true)
-
-        // The context weather was .fog → variant should be "foggy".
-        // We verify via the ArrivalResult's discovery context.
         #expect(result.discovery.context.weather == .fog)
 
-        // And the stored prop should carry the foggy variant.
-        let props = worldStore.current().props
-        let lastProp = try #require(props.last)
-        #expect(lastProp.variant == "foggy")
+        // The logged journal entry should carry the foggy variant.
+        let entry = try #require(worldStore.allJournalEntries().first)
+        #expect(entry.variant == "foggy")
     }
 
-    @Test("SpecimenMapping.kind is applied at arrive time (park → tree)")
+    @Test("SpecimenMapping.kind tints the journal entry (park → tree)")
     func arriveAppliesCategoryMapping() async throws {
         let poi = makePOI(ref: "poi.park.mapping", category: .park)
         let catalog = FixtureCatalog(pois: [poi])
@@ -307,15 +302,15 @@ struct AnchorArrivalJournalTests {
         await vm.refresh()
         await vm.arrive()
 
-        let lastProp = try #require(worldStore.current().props.last)
-        #expect(lastProp.kind == .tree)  // park → tree (FR-21)
+        let entry = try #require(worldStore.allJournalEntries().first)
+        #expect(entry.kind == .tree)  // park → tree (FR-21)
     }
 }
 
-// MARK: - DriftViewModel specimen growth (US-F2, US-F3)
+// MARK: - DriftViewModel points (replaces per-cell specimen growth)
 
 @MainActor
-@Suite("StreamF — DriftViewModel specimen growth", .serialized)
+@Suite("StreamF — DriftViewModel points", .serialized)
 struct DriftSpecimenGrowthTests {
 
     static let container: ModelContainer = {
@@ -354,8 +349,8 @@ struct DriftSpecimenGrowthTests {
         }
     }
 
-    @Test("A new cell in a Drift session grows a specimen")
-    func newCellGrowsSpecimen() async throws {
+    @Test("A new cell in a Drift session awards points (no specimen)")
+    func newCellAwardsPoints() async throws {
         let discoveryStore = InMemoryDiscoveryStore()
         let worldStore = freshWorldStore()
 
@@ -370,44 +365,20 @@ struct DriftSpecimenGrowthTests {
         )
         vm.worldStore = worldStore
 
-        let propsBefore = worldStore.current().props.count
+        let pointsBefore = worldStore.totalPoints()
+        let propsBefore  = worldStore.current().props.count
 
         vm.startRamble()
-        await waitUntil { worldStore.current().props.count > propsBefore }
+        await waitUntil { vm.pointsThisSession > 0 }
 
-        let propsAfter = worldStore.current().props.count
-        #expect(propsAfter > propsBefore)
+        // Points went up; a single cell does not cross a tier, so no specimen grew.
+        #expect(vm.pointsThisSession >= DriftViewModel.cellPoints)
+        #expect(worldStore.totalPoints() > pointsBefore)
+        #expect(worldStore.current().props.count == propsBefore)
     }
 
-    @Test("A Drift cell specimen has a journal entry")
-    func driftCellSpecimenHasJournalEntry() async throws {
-        let discoveryStore = InMemoryDiscoveryStore()
-        let worldStore = freshWorldStore()
-
-        let location = MockDriftLocationSession()
-        location.queuedCoordinates = [coordA]
-
-        let vm = DriftViewModel(
-            location: location,
-            recommender: StubRecommender(catalog: StubPOICatalog(),
-                                        discoveries: discoveryStore),
-            discoveries: discoveryStore
-        )
-        vm.worldStore = worldStore
-
-        vm.startRamble()
-        await waitUntil {
-            worldStore.current().props.contains { worldStore.journalEntry(forPropID: $0.id) != nil }
-        }
-
-        // Find the newly grown specimen(s).
-        let props = worldStore.current().props
-        let newProps = props.filter { worldStore.journalEntry(forPropID: $0.id) != nil }
-        #expect(!newProps.isEmpty)
-    }
-
-    @Test("A re-explored cell does not grow a second specimen")
-    func reExploredCellDoesNotGrowSecondSpecimen() async throws {
+    @Test("A re-explored cell awards no points")
+    func reExploredCellAwardsNoPoints() async throws {
         let discoveryStore = InMemoryDiscoveryStore()
         // Pre-populate the store with coordA's cell as already explored.
         let cellID = GeohashCell.encode(coordA, precision: 7)
@@ -429,14 +400,14 @@ struct DriftSpecimenGrowthTests {
         )
         vm.worldStore = worldStore
 
-        let propsBefore = worldStore.current().props.count
+        let pointsBefore = worldStore.totalPoints()
 
         vm.startRamble()
         try? await Task.sleep(for: .milliseconds(150))
 
-        // No new specimen should have grown for the re-explored cell.
-        let propsAfter = worldStore.current().props.count
-        #expect(propsAfter == propsBefore)
+        // A cell explored on a past session yields no fresh points.
+        #expect(vm.pointsThisSession == 0)
+        #expect(worldStore.totalPoints() == pointsBefore)
     }
 }
 

@@ -102,6 +102,18 @@ struct DriftViewModelTests {
         return (vm, location, store)
     }
 
+    /// Poll until `condition` holds or the timeout elapses. The breadcrumb consumer
+    /// is a fire-and-forget Task, so a fixed sleep is flaky under the full parallel
+    /// suite (MainActor contention) — polling is robust (mirrors StreamF tests).
+    private func waitUntil(timeout: Duration = .seconds(5),
+                           _ condition: () -> Bool) async {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while ContinuousClock.now < deadline {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
     // ── Session lifecycle ──────────────────────────────────────────────────────
 
     @Test("startRamble creates an active session")
@@ -155,13 +167,13 @@ struct DriftViewModelTests {
         let (vm, location, store) = makeSUT(queuedCoords: [coordA, coordB])
         location.queuedCoordinates = [coordA, coordB]
 
-        vm.startRamble()
-        // Wait for the async breadcrumb stream to be fully consumed.
-        try? await Task.sleep(for: .milliseconds(100))
-
-        let exploredCells = store.exploredCells()
         let cellA = GeohashCell.encode(coordA, precision: 7)
         let cellB = GeohashCell.encode(coordB, precision: 7)
+
+        vm.startRamble()
+        await waitUntil { store.exploredCells().contains(cellA) && store.exploredCells().contains(cellB) }
+
+        let exploredCells = store.exploredCells()
         #expect(exploredCells.contains(cellA))
         #expect(exploredCells.contains(cellB))
     }
@@ -174,11 +186,12 @@ struct DriftViewModelTests {
         let (vm, location, _) = makeSUT()
         location.queuedCoordinates = [coordA, coordANear]
 
-        vm.startRamble()
-        try? await Task.sleep(for: .milliseconds(100))
-
-        // newCells should contain exactly one entry.
         let cellA = GeohashCell.encode(coordA, precision: 7)
+
+        vm.startRamble()
+        await waitUntil { !vm.newCells.isEmpty }
+
+        // Both breadcrumbs are in the same cell → exactly one entry.
         #expect(vm.newCells == Set([cellA]))
     }
 
@@ -196,10 +209,11 @@ struct DriftViewModelTests {
         let (vm, location, _) = makeSUT()
         location.queuedCoordinates = [coordC]
 
-        vm.startRamble()
-        try? await Task.sleep(for: .milliseconds(100))
-
         let cellC = GeohashCell.encode(coordC, precision: 7)
+
+        vm.startRamble()
+        await waitUntil { vm.newCells.contains(cellC) }
+
         #expect(vm.newCells.contains(cellC))
         #expect(vm.allExploredCells.contains(cellC))
     }
@@ -211,15 +225,15 @@ struct DriftViewModelTests {
         let (vm, location, _) = makeSUT(queuedCoords: [coordA, coordB, coordC])
         location.queuedCoordinates = [coordA, coordB, coordC]
 
-        vm.startRamble()
-        try? await Task.sleep(for: .milliseconds(150))
-        vm.endRamble()
-
         let expected = Set([
             GeohashCell.encode(coordA, precision: 7),
             GeohashCell.encode(coordB, precision: 7),
             GeohashCell.encode(coordC, precision: 7),
         ]).count
+
+        vm.startRamble()
+        await waitUntil { vm.newCells.count == expected }
+        vm.endRamble()
 
         #expect(vm.summary?.newCellsCount == expected)
     }
@@ -243,7 +257,7 @@ struct DriftViewModelTests {
         location.queuedCoordinates = [coordA, coordB]
 
         vm.startRamble()
-        try? await Task.sleep(for: .milliseconds(100))
+        await waitUntil { vm.distanceMeters > 0 }
 
         #expect(vm.distanceMeters > 0)
     }

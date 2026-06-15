@@ -22,12 +22,16 @@ import simd
 /// simpler and more robust.
 @Model
 final class WorldStateRecord {
-    /// 0...1 — lushness / glow. This is "progress," not a score.
+    /// 0...1 — lushness / glow. Derived upward from `points` (never decreases).
     var vitality: Double
+    /// Exploration points (Explore discoveries + collected Drift spots). Drives
+    /// tiered globe growth. Default 0 → lightweight migration for existing stores.
+    var points: Int = 0
     var createdAt: Date
 
-    init(vitality: Double = 0.6, createdAt: Date = .now) {
+    init(vitality: Double = 0.6, points: Int = 0, createdAt: Date = .now) {
         self.vitality = vitality
+        self.points = points
         self.createdAt = createdAt
     }
 }
@@ -88,11 +92,18 @@ final class JournalEntry {
     var id: UUID
     var questId: UUID
     /// The specimen this reflection is attached to (linked by id, not relation).
+    /// For decoupled discovery entries (Explore) this is a fresh UUID — the entry
+    /// stands alone and is fetched via `allJournalEntries()`, not by prop.
     var propID: UUID
     var text: String
     var photoRef: String?
     var date: Date
     var placeName: String
+    /// Cosmetic specimen kind for the journal art ("tree"/"building"/"flowers").
+    /// Default keeps lightweight migration working for existing stores.
+    var kindRaw: String = "flowers"
+    /// Appearance variant ("clear"/"foggy") so the journal art matches the moment.
+    var variant: String = "clear"
 
     init(id: UUID = UUID(),
          questId: UUID,
@@ -100,7 +111,9 @@ final class JournalEntry {
          text: String,
          photoRef: String? = nil,
          date: Date = .now,
-         placeName: String) {
+         placeName: String,
+         kind: WorldProp.Kind = .flowers,
+         variant: String = "clear") {
         self.id = id
         self.questId = questId
         self.propID = propID
@@ -108,5 +121,9 @@ final class JournalEntry {
         self.photoRef = photoRef
         self.date = date
         self.placeName = placeName
+        self.kindRaw = kind.rawValue
+        self.variant = variant
     }
+
+    var kind: WorldProp.Kind { WorldProp.Kind(rawValue: kindRaw) ?? .flowers }
 }
