@@ -88,10 +88,11 @@ struct FogMapView: View {
     /// cell's projected point. New cells clear wider/brighter than old ones.
     private func fogMask(proxy: MapProxy) -> some View {
         Canvas { context, size in
-            // 1. Lay down the fog over the whole map.
+            // 1. Lay down the fog over the whole map — a light cool haze that reads
+            //    as fog (lightens/desaturates the unexplored map), not a dark vignette.
             context.fill(
                 Path(CGRect(origin: .zero, size: size)),
-                with: .color(Theme.Garden.dusk.opacity(0.55))
+                with: .color(Color(hex: "C7D6D6").opacity(0.86))
             )
             // 2. Punch feathered clearings at each explored cell.
             context.blendMode = .destinationOut
