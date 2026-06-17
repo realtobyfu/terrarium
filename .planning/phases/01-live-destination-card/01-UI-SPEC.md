@@ -45,12 +45,27 @@ All values already declared in `Theme.Spacing`. Use only these tokens — no mag
 | lg | `Theme.Spacing.l` | 16pt | Card outer horizontal padding, header/stub padding |
 | xl | `Theme.Spacing.xl` | 24pt | Section separation (card → actions), scrim overlay padding |
 
-Exceptions:
-- Perforation seam height: 22pt (hardcoded in `TicketDestinationCard` — leave as-is)
-- Ticket stub section height: 66pt (hardcoded — leave as-is)
-- Notch radius on ticket shape: 11pt (leave as-is)
-- Notch radius on compact stub: 9pt (leave as-is)
-- Art column width on compact stub: 112pt (leave as-is)
+All grid-spacing tokens above are multiples of 4. New code must use only these tokens for margins, padding, and gaps.
+
+**Shape geometry constants (NOT spacing tokens).** The following values are
+structural dimensions of the custom `TicketShape` / `HTicketShape` (notch radii,
+perforation-seam height, stub-section height, art-column width). They are part of
+the locked card geometry inherited from `DestinationCardVariants.swift`, not
+grid-spacing/padding decisions, and are exempt from the multiple-of-4 spacing rule.
+The executor must leave them exactly as-is:
+
+| Constant | Value | Multiple of 4? | Classification |
+|----------|-------|----------------|----------------|
+| Perforation seam height (ticket) | 22pt | no | shape geometry — frozen |
+| Stub section height (ticket) | 66pt | no | shape geometry — frozen |
+| Notch radius (ticket shape) | 11pt | no | shape geometry — frozen |
+| Notch radius (compact stub) | 9pt | no | shape geometry — frozen |
+| Art column width (compact stub) | 112pt | yes | shape geometry — frozen |
+
+**Button vertical padding.** New action-area code uses spacing tokens only.
+The primary CTA and secondary buttons use **8pt** (`Theme.Spacing.s`) vertical
+padding — NOT the 6pt/4pt raw values seen in earlier workshop code. This is the
+one place a non-token value was introduced; it is corrected to the scale here.
 
 **Source:** Extracted from `DestinationCardVariants.swift` and `Tokens.swift`.
 
@@ -71,21 +86,53 @@ Exceptions:
 
 ## Typography
 
-All sizes extracted from `DestinationCardVariants.swift` and `AnchorView.swift`. Use `Theme.Typography.display()` and `Theme.Typography.body()` factory functions — never raw `.font(.system(...))`.
+> **Freeze-exemption notice.** This phase promotes an ALREADY-IMPLEMENTED, locked
+> design (`TicketDestinationCard` / `CompactDestinationRow` + the live `AnchorView`
+> chrome) from preview files into production. It does NOT author a new type scale.
+> The contract below is therefore expressed in two parts: (1) the **Core Type Scale**
+> — the 4-size / 2-weight design contract the executor builds to, and (2) a
+> **Frozen Source-Size Map** documenting how the inherited per-element point sizes
+> from the locked components roll into those four tiers. The source sizes are
+> frozen from `DestinationCardVariants.swift` / `AnchorView.swift` and are not being
+> redesigned in this phase; the executor must NOT introduce sizes outside the four
+> core tiers in any NEW code.
 
-| Role | Factory | Size | Weight | Line Height | Usage |
+Use `Theme.Typography.display()` and `Theme.Typography.body()` factory functions — never raw `.font(.system(...))`.
+
+### Core Type Scale (the contract — 4 sizes, 2 weights)
+
+| Tier | Factory | Size | Weight | Line Height | Usage |
 |------|---------|------|--------|-------------|-------|
-| Screen heading | `display` | 30pt | `.bold` | default (~1.2) | "The Hidden Garden" screen title in AnchorView header |
-| Card name (ticket) | `display` | 28pt | `.semibold` | default, `lineLimit(2)` min scale 0.7 | POI name in ticket header scrim |
-| Card name (compact) | `display` | 20pt | `.semibold` | default, `lineLimit(1)` min scale 0.8 | POI name in compact stub |
-| Body / description | `body` | 15pt | `.regular` | default (~1.5), fixed height | POI vibe line in ticket header; description in compact stub (`lineLimit(2)`) |
-| Eyebrow / caption | `body` | 11pt | `.semibold` | n/a | Ticket card: category + neighborhood, letter-spacing 1.4; compact stub: 10pt, tracking 1.2 |
-| Stub field caption | `body` | 9pt | `.heavy` | n/a | STATUS / ON FOOT labels in ticket stub; letter-spacing 1.4 |
-| Stub field value | `body` | 15pt | `.semibold` | `lineLimit(1)` | Open status and walk time in ticket stub |
-| Screen eyebrow | `body` | 13pt | `.semibold` | n/a | "Discovery" eyebrow above screen title; letter-spacing 2.0 |
-| Pill text | `body` | 13pt | `.semibold` | n/a | Status + walk pills on card |
+| Display | `display` | 28pt | `.semibold` | default (~1.2), `minimumScaleFactor` | POI name (primary card) and all heading-class text |
+| Body | `body` | 15pt | `.regular` | ~1.5 | Vibe line, descriptions, stub field values, CTA labels |
+| Label | `body` | 12pt | `.semibold` | n/a, tracked | Eyebrows, pill text, screen eyebrow |
+| Caption | `body` | 9pt | `.semibold` | n/a, tracked | Stub field captions (STATUS / ON FOOT) |
 
-**Source:** `DestinationCardVariants.swift` (lines 68–69, 149–156, 245–268, 349–407), `AnchorView.swift` (lines 119–127).
+**Two weights only:** `.regular` (base) and `.semibold` (strong). All inherited
+`.bold`, `.medium`, and `.heavy` usages map to `.semibold`; everything else maps to
+`.regular`. New code must use only these two weights.
+
+### Frozen Source-Size Map (inherited from locked components — do not re-derive)
+
+The locked card/chrome code already ships these exact sizes. They are documented
+here for executor fidelity and are exempt from the 4-size rule under the freeze
+notice above. The executor leaves these call sites untouched; only NEW typography
+must conform to the Core Type Scale.
+
+| Source element | Source size | Source weight | Core tier it represents |
+|----------------|-------------|---------------|------------------------|
+| Screen heading ("The Hidden Garden") | 30pt | `.bold` | Display (bold one-off override) |
+| Card name — ticket | 28pt | `.semibold` | Display |
+| Card name — compact stub | 20pt | `.semibold` | Display (compact context) |
+| Vibe line / description | 15pt / 14pt / 13pt | `.regular` | Body |
+| Stub field value | 15pt | `.semibold` | Body (strong) |
+| CTA "Take me there" | 17pt | `.semibold` | Body (large-control override) |
+| Re-roll / arrival labels | 15pt | `.medium` → `.semibold` | Body |
+| Screen eyebrow / pill text | 13pt | `.semibold` | Label |
+| Card eyebrow (ticket / compact) | 11pt / 10pt | `.semibold` | Label |
+| Stub field caption | 9pt | `.heavy` → `.semibold` | Caption |
+
+**Source:** `DestinationCardVariants.swift` (lines 68–69, 149–156, 245–268, 349–407), `AnchorView.swift` (lines 119–127, 166).
 
 ---
 
@@ -217,27 +264,28 @@ Shown only when `viewModel.pick != nil && !viewModel.isLoading && viewModel.arri
 - Label: `Label("Take me there", systemImage: "figure.walk")`
 - Font: `Theme.Typography.body(17, weight: .semibold)`
 - Action: `viewModel.openInMaps()`
-- Width: `maxWidth: .infinity`, vertical padding 6pt
+- Width: `maxWidth: .infinity`, vertical padding `Theme.Spacing.s` (8pt)
 
 **"Another" (re-roll):**
 - Style: `.buttonStyle(.glass)`, tint `Theme.Garden.mossLight`
-- Label: `Label("Another", systemImage: "arrow.clockwise")`
-- Font: `Theme.Typography.body(15, weight: .medium)`
+- Label: `Label("Another", systemImage: "arrow.clockwise")` (visible copy is locked from the workshop decision)
+- Accessibility label: `.accessibilityLabel("Another place")` — the visible label is a single word; the icon (`arrow.clockwise`) supplies the verb visually, and this accessibility label supplies the noun for screen readers
+- Font: `Theme.Typography.body(15, weight: .semibold)`
 - Action: `withAnimation(.smooth) { viewModel.rollAnother() }`
-- Width: `maxWidth: .infinity` within HStack, vertical padding 4pt
+- Width: `maxWidth: .infinity` within HStack, vertical padding `Theme.Spacing.xs` (4pt)
 
 **"I'm here" (arrival):**
 - Style: `.buttonStyle(.glass)`, tint `Theme.Garden.pine`
 - Label: `Label("I'm here", systemImage: "mappin.and.ellipse")`
-- Font: `Theme.Typography.body(15, weight: .medium)`
+- Font: `Theme.Typography.body(15, weight: .semibold)`
 - Action: `Task { await viewModel.arrive() }`
 - Disabled: `!viewModel.arrivalProximity.allowsCheckIn`
-- Width: `maxWidth: .infinity` within HStack, vertical padding 4pt
+- Width: `maxWidth: .infinity` within HStack, vertical padding `Theme.Spacing.xs` (4pt)
 
 **Status note (above actions):**
 - `arrivalBlocked == true` → icon `location.slash.fill` + "Not there yet — get a little closer to check in."
 - `arrivalHint != nil` → icon `location.circle` + hint string
-- Font: `Theme.Typography.body(13, weight: .medium)`, color `Theme.Palette.secondary`
+- Font: `Theme.Typography.body(13, weight: .semibold)`, color `Theme.Palette.secondary`
 - Animation: `.smooth` on `arrivalBlocked` and `arrivalHint` changes
 
 **Action container:** `GlassEffectContainer(spacing: Theme.Spacing.m)` wrapping `VStack(spacing: Theme.Spacing.m)`.
@@ -267,7 +315,7 @@ All copy extracted from existing code — do not change wording.
 | Element | Copy | Source |
 |---------|------|--------|
 | Primary CTA | "Take me there" | `AnchorView.swift:166` |
-| Re-roll action | "Another" | `AnchorView.swift:181` |
+| Re-roll action | "Another" (visible, locked) · `.accessibilityLabel("Another place")` for screen readers | `AnchorView.swift:181` |
 | Arrival action | "I'm here" | `AnchorView.swift:192` |
 | Screen eyebrow | "Discovery" | `AnchorView.swift:120` |
 | Screen heading | "The Hidden Garden" | `AnchorView.swift:123` |
