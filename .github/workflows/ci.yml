@@ -49,11 +49,15 @@ jobs:
             -configuration Debug \
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath "$DERIVED" \
+            -only-testing:TerrariumTests \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Run tests
         run: |
           set +e
+          # Scope to the real unit/integration suite; the default template UI
+          # tests (launch-performance, etc.) are slow/flaky on hosted runners and
+          # add no coverage — the capture step exercises a real launch instead.
           xcodebuild test-without-building \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
@@ -61,6 +65,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath "$DERIVED" \
             -resultBundlePath "$RESULT_BUNDLE" \
+            -only-testing:TerrariumTests \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log
           echo "TEST_RESULT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
           exit 0
