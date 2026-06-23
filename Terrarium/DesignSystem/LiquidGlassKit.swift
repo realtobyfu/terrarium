@@ -134,10 +134,14 @@ struct TactilePrimaryButtonStyle: ButtonStyle {
 
 /// Floating glass app bar: leaf affordance · "Terrarium" wordmark · weather chip.
 /// Mirrors the mockup's pill header and stays clear of the Dynamic Island.
-struct DiscoveryTopBar: View {
+struct DiscoveryTopBar<Trailing: View>: View {
     var weatherSystemImage: String
     var weatherText: String
     var onLeading: () -> Void = {}
+    /// Optional accessory pinned to the far trailing edge (e.g. a Settings gear).
+    /// Defaults to `EmptyView` via the convenience init below, so existing call
+    /// sites are unaffected.
+    @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
         GlassEffectContainer(spacing: 10) {
@@ -160,8 +164,22 @@ struct DiscoveryTopBar: View {
                 .frame(height: 40)
                 .glassEffect(.regular, in: .capsule)
                 .accessibilityElement(children: .combine)
+
+                trailing()
             }
         }
+    }
+}
+
+extension DiscoveryTopBar where Trailing == EmptyView {
+    /// Convenience init for the common case with no trailing accessory.
+    init(weatherSystemImage: String,
+         weatherText: String,
+         onLeading: @escaping () -> Void = {}) {
+        self.init(weatherSystemImage: weatherSystemImage,
+                  weatherText: weatherText,
+                  onLeading: onLeading,
+                  trailing: { EmptyView() })
     }
 }
 

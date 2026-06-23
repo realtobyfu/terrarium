@@ -29,7 +29,8 @@ enum OnboardingStep: Int, CaseIterable {
     case interestTags  = 1
     case vibe          = 2
     case radius        = 3
-    case locationPrime = 4
+    case transport     = 4
+    case locationPrime = 5
 }
 
 // MARK: - OnboardingViewModel
@@ -51,6 +52,9 @@ final class OnboardingViewModel {
     var selectedCategories: Set<POICategory> = []
     var selectedVibes: Set<Vibe> = []
     var travelRadiusMeters: Double = 2000
+
+    /// Preferred way of getting to a place; drives the Anchor card's ETA.
+    private(set) var selectedTransportMode: TransportMode = .walk
 
     // MARK: Location priming callback
 
@@ -89,6 +93,11 @@ final class OnboardingViewModel {
         } else {
             selectedCategories.insert(category)
         }
+    }
+
+    /// Set the preferred transport mode (single-select).
+    func selectTransportMode(_ mode: TransportMode) {
+        selectedTransportMode = mode
     }
 
     /// Toggle a vibe preference.
@@ -141,6 +150,7 @@ final class OnboardingViewModel {
             travelRadiusMeters: travelRadiusMeters
         )
         store.save(prefs)
+        store.saveTransportMode(selectedTransportMode)
     }
 
     // MARK: - Radius defaults (per explore-decisions.md)
