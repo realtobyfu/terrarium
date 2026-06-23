@@ -57,6 +57,10 @@ struct AnchorView: View {
                 await viewModel.refresh()
             }
         }
+        // Recompute distance/ETA whenever the pick changes (re-roll is synchronous).
+        .task(id: viewModel.pick?.poiRef) {
+            await viewModel.updateTravelInfo()
+        }
         // Celebratory beat when an arrival pushes the garden to a new tier.
         .rewardOverlay(
             isPresented: $showReward,
@@ -97,7 +101,8 @@ struct AnchorView: View {
                             eyebrow: "\(poi.category.label) · \(poi.neighborhood)",
                             description: viewModel.vibeLine,
                             openText: viewModel.pickIsLikelyOpen ? "Open Now" : "Hours vary",
-                            walkText: viewModel.walkInfo.map { "\($0.walkMinutes) min" }
+                            walkText: viewModel.travelInfo.map { "\($0.minutes) min" },
+                            travelGlyph: (viewModel.travelInfo?.mode ?? viewModel.transportMode).systemImage
                         )
                     } else {
                         EmptyDiscoveryCard(onRetry: { Task { await viewModel.refresh() } })

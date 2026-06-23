@@ -13,11 +13,13 @@ import Observation
 enum HomeSheet: Identifiable, Equatable {
     case growthLog
     case specimenJournal(UUID)
+    case settings
 
     var id: String {
         switch self {
         case .growthLog:                   return "growthLog"
         case .specimenJournal(let propID): return "specimen-\(propID.uuidString)"
+        case .settings:                    return "settings"
         }
     }
 }
@@ -83,6 +85,10 @@ final class HomeViewModel {
 
     func openGrowthLog() {
         activeSheet = .growthLog
+    }
+
+    func openSettings() {
+        activeSheet = .settings
     }
 
     func dismissSheet() {

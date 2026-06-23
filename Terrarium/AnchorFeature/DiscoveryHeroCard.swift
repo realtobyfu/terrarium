@@ -25,8 +25,10 @@ struct DiscoveryHeroCard: View {
     let description: String?
     /// "Open Now" / "Hours vary".
     let openText: String
-    /// "12 min" walk estimate, when location is known.
+    /// "12 min" travel estimate, when location is known.
     let walkText: String?
+    /// SF Symbol for the travel pill, matching the user's transport mode.
+    var travelGlyph: String = "figure.walk"
 
     var body: some View {
         SoftPanel(cornerRadius: Theme.Radius.hero) {
@@ -99,7 +101,7 @@ struct DiscoveryHeroCard: View {
             HStack(spacing: 8) {
                 OrganicPill(systemImage: "leaf.fill", text: openText, tint: Theme.Garden.moss)
                 if let walkText {
-                    OrganicPill(systemImage: "figure.walk", text: walkText, tint: Theme.Garden.bloom)
+                    OrganicPill(systemImage: travelGlyph, text: walkText, tint: Theme.Garden.bloom)
                 }
             }
         }

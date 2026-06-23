@@ -32,6 +32,11 @@ final class AnchorViewModel {
     /// Non-nil once the user has tapped "I'm here" and the award has resolved.
     private(set) var arrivalResult: ArrivalResult?
 
+    /// Distance + ETA to the current pick in the user's preferred transport mode.
+    /// Populated by `updateTravelInfo()` — an instant offline estimate first, then
+    /// refined with a real MapKit ETA where a routing profile exists.
+    private(set) var travelInfo: TravelInfo?
+
     // -------------------------------------------------------------------------
     // MARK: Injected dependencies
     // -------------------------------------------------------------------------
@@ -42,6 +47,10 @@ final class AnchorViewModel {
     let location: LocationSessionProviding
     let discoveries: DiscoveryStore
     let preferences: UserPreferences
+    /// Re-read on each travel-info compute so a mode change in Settings applies
+    /// when the user returns to the Anchor tab. Defaulted so previews/tests that
+    /// don't care about transport mode keep compiling.
+    let preferencesStore: PreferencesStore
 
     /// Persistent store for the terrarium handoff (US-D2).
     var worldStore: WorldStore?
@@ -74,13 +83,15 @@ final class AnchorViewModel {
          recommender: PlaceRecommending,
          location: LocationSessionProviding,
          discoveries: DiscoveryStore,
-         preferences: UserPreferences = .default) {
+         preferences: UserPreferences = .default,
+         preferencesStore: PreferencesStore = PreferencesStore()) {
         self.catalog = catalog
         self.weather = weather
         self.recommender = recommender
         self.location = location
         self.discoveries = discoveries
         self.preferences = preferences
+        self.preferencesStore = preferencesStore
     }
 
     // -------------------------------------------------------------------------
@@ -130,6 +141,8 @@ final class AnchorViewModel {
         pick = pool.first
         arrivalResult = nil
         _ = topRef // suppress warning
+
+        await updateTravelInfo()
     }
 
     // -------------------------------------------------------------------------
@@ -291,18 +304,59 @@ final class AnchorViewModel {
         }
     }
 
-    /// Formatted walk distance and estimated time when a coordinate is available.
-    var walkInfo: WalkInfo? {
-        guard let poi = pick, let userCoord = context?.coordinate else { return nil }
-        let distanceMeters = haversineMeters(
-            from: userCoord,
-            to: poi.coordinate
+    /// The user's preferred transport mode, re-read from the store on each compute
+    /// so a change made in Settings takes effect when the user returns to Anchor.
+    var transportMode: TransportMode { preferencesStore.loadTransportMode() }
+
+    /// Recompute distance + ETA for the current pick. Sets an instant offline
+    /// estimate first (so the card never shows empty), then refines it with a real
+    /// MapKit ETA for walk/transit/drive. Cycling has no Apple routing profile, and
+    /// a missing fix or any routing error simply keep the estimate. Safe to call on
+    /// every refresh and re-roll.
+    func updateTravelInfo() async {
+        guard let poi = pick, let userCoord = context?.coordinate else {
+            travelInfo = nil
+            return
+        }
+        let mode = transportMode
+
+        // 1. Instant, offline estimate — always available, works against stubs.
+        travelInfo = offlineEstimate(from: userCoord, to: poi.coordinate, mode: mode)
+
+        // 2. Refine with a real route where Apple provides a profile.
+        guard let transportType = mode.directionsTransportType else { return }
+        let request = MKDirections.Request()
+        request.source = mapItem(for: userCoord)
+        request.destination = mapItem(for: poi.coordinate)
+        request.transportType = transportType
+
+        guard let route = try? await MKDirections(request: request).calculate().routes.first else {
+            return // keep the offline estimate
+        }
+        // Discard a stale response if the pick changed while we awaited.
+        guard pick?.poiRef == poi.poiRef else { return }
+        travelInfo = TravelInfo(
+            distanceMeters: route.distance,
+            minutes: max(1, Int((route.expectedTravelTime / 60).rounded(.up))),
+            mode: mode,
+            isEstimate: false
         )
-        let walkMinutes = Int((distanceMeters / 1.4 / 60).rounded(.up)) // ~1.4 m/s walking
-        return WalkInfo(
-            distanceMeters: distanceMeters,
-            walkMinutes: max(1, walkMinutes)
-        )
+    }
+
+    /// Offline haversine + per-mode speed estimate. Used immediately and as the
+    /// fallback whenever a MapKit route is unavailable.
+    private func offlineEstimate(from a: Coordinate, to b: Coordinate, mode: TransportMode) -> TravelInfo {
+        let distanceMeters = haversineMeters(from: a, to: b)
+        let minutes = Int((distanceMeters / mode.metersPerSecond / 60).rounded(.up))
+        return TravelInfo(distanceMeters: distanceMeters,
+                          minutes: max(1, minutes),
+                          mode: mode,
+                          isEstimate: true)
+    }
+
+    private func mapItem(for coord: Coordinate) -> MKMapItem {
+        let clCoord = CLLocationCoordinate2D(latitude: coord.latitude, longitude: coord.longitude)
+        return MKMapItem(placemark: MKPlacemark(coordinate: clCoord))
     }
 
     /// True when the pick is tagged as open-now (or unknown — soft-allowed).
@@ -335,17 +389,40 @@ final class AnchorViewModel {
 // MARK: Supporting value types
 // -------------------------------------------------------------------------
 
-/// Walk distance + time estimate from the user's current location to the pick.
-struct WalkInfo: Equatable {
+/// Distance + ETA from the user's current location to the pick, in their
+/// preferred transport mode.
+struct TravelInfo: Equatable {
     let distanceMeters: Double
-    let walkMinutes: Int
+    /// Estimated minutes (always >= 1).
+    let minutes: Int
+    /// The mode this estimate was computed for (drives the card's icon/caption).
+    let mode: TransportMode
+    /// True when this is the offline speed estimate (no MapKit route available).
+    let isEstimate: Bool
 
-    /// e.g. "850 m · ~10 min walk"
+    /// e.g. "850 m · ~10 min walk" / "1.2 km · ~6 min drive".
     var label: String {
         let dist = distanceMeters >= 1000
             ? String(format: "%.1f km", distanceMeters / 1000)
             : "\(Int(distanceMeters.rounded())) m"
-        return "\(dist) · ~\(walkMinutes) min walk"
+        return "\(dist) · ~\(minutes) min \(mode.verb)"
+    }
+}
+
+// -------------------------------------------------------------------------
+// MARK: TransportMode → MapKit mapping (kept here so Domain stays MapKit-free)
+// -------------------------------------------------------------------------
+
+private extension TransportMode {
+    /// The matching MapKit routing profile, or `nil` when Apple offers none
+    /// (cycling) — in which case we always fall back to the offline estimate.
+    var directionsTransportType: MKDirectionsTransportType? {
+        switch self {
+        case .walk:    return .walking
+        case .transit: return .transit
+        case .drive:   return .automobile
+        case .cycle:   return nil
+        }
     }
 }
 

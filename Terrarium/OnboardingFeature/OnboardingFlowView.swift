@@ -63,6 +63,7 @@ struct OnboardingFlowView: View {
         case .persona, .interestTags: interestsStep
         case .vibe:          vibeStep
         case .radius:        radiusStep
+        case .transport:     transportStep
         case .locationPrime: primingStep
         }
     }
@@ -124,6 +125,29 @@ struct OnboardingFlowView: View {
             )
             RadiusSlider(meters: $viewModel.travelRadiusMeters)
                 .padding(.top, Theme.Spacing.s)
+        }
+        .transition(Self.stepTransition)
+    }
+
+    private var transportStep: some View {
+        VStack(spacing: Theme.Spacing.xl) {
+            OnboardingStepHeader(
+                eyebrow: "Step Four",
+                title: "How do you\nlike to get there?",
+                subtitle: "We'll show distance and time the way you travel. Change it anytime."
+            )
+            GlassEffectContainer(spacing: Theme.Spacing.m) {
+                LazyVGrid(columns: Self.chipColumns, spacing: Theme.Spacing.m) {
+                    ForEach(TransportMode.allCases, id: \.self) { mode in
+                        SelectableChip(
+                            label: mode.label,
+                            icon: mode.systemImage,
+                            isSelected: viewModel.selectedTransportMode == mode,
+                            action: { viewModel.selectTransportMode(mode) }
+                        )
+                    }
+                }
+            }
         }
         .transition(Self.stepTransition)
     }

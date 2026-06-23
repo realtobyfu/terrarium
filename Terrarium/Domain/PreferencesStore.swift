@@ -38,6 +38,7 @@ final class PreferencesStore {
     private enum Keys {
         static let preferences         = "terrarium.userPreferences.v1"
         static let onboardingCompleted = "terrarium.onboardingCompleted.v1"
+        static let transportMode       = "terrarium.transportMode.v1"
     }
 
     // MARK: Init
@@ -70,6 +71,27 @@ final class PreferencesStore {
     func save(_ preferences: UserPreferences) {
         guard let data = try? JSONEncoder().encode(preferences) else { return }
         defaults.set(data, forKey: Keys.preferences)
+    }
+
+    // MARK: Transport mode
+
+    /// Load the preferred transport mode. Returns `.default` (walk) on first
+    /// launch or if the stored raw value is unrecognised. Stored separately from
+    /// `UserPreferences` because the mode is a display/navigation preference and
+    /// does not feed the ranker (keeps the frozen `ExploreModels` contract intact).
+    func loadTransportMode() -> TransportMode {
+        guard
+            let raw = defaults.string(forKey: Keys.transportMode),
+            let mode = TransportMode(rawValue: raw)
+        else {
+            return .default
+        }
+        return mode
+    }
+
+    /// Persist the preferred transport mode.
+    func saveTransportMode(_ mode: TransportMode) {
+        defaults.set(mode.rawValue, forKey: Keys.transportMode)
     }
 
     // MARK: Onboarding flag

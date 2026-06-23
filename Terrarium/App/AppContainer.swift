@@ -103,7 +103,8 @@ final class AppContainer {
                                  recommender: recommender,
                                  location: locationSession,
                                  discoveries: discoveryStore,
-                                 preferences: preferences)
+                                 preferences: preferences,
+                                 preferencesStore: preferencesStore)
         vm.worldStore = worldStore
         // US-F1: inject the real LocationVerifier so Anchor arrival is
         // geofence-verified (with honor-mode fallback when location is
@@ -112,6 +113,12 @@ final class AppContainer {
         vm.arrivalVerifier = LocationVerifier(catalog: poiCatalog,
                                               location: locationSession)
         return vm
+    }
+
+    /// Settings sheet (gear on Home). Edits transport mode + onboarding prefs,
+    /// persisting straight to `preferencesStore`.
+    func makeSettingsViewModel() -> SettingsViewModel {
+        SettingsViewModel(store: preferencesStore)
     }
 
     func makeDriftViewModel() -> DriftViewModel {

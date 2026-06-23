@@ -10,6 +10,7 @@ import SwiftUI
 
 struct HomeView: View {
     @State var viewModel: HomeViewModel
+    @Environment(\.container) private var container
 
     var body: some View {
         ZStack {
@@ -41,7 +42,12 @@ struct HomeView: View {
         .safeAreaInset(edge: .top) {
             DiscoveryTopBar(
                 weatherSystemImage: viewModel.sky.weather.homeGlyph,
-                weatherText: "\(viewModel.sky.weather.homeLabel) · \(viewModel.sky.localTimeLabel)"
+                weatherText: "\(viewModel.sky.weather.homeLabel) · \(viewModel.sky.localTimeLabel)",
+                trailing: {
+                    GlassIconButton(systemImage: "gearshape.fill",
+                                    accessibilityLabel: "Settings",
+                                    action: { viewModel.openSettings() })
+                }
             )
             .padding(.horizontal, Theme.Spacing.l)
             .padding(.bottom, Theme.Spacing.s)
@@ -60,6 +66,8 @@ struct HomeView: View {
                 if let reflection = viewModel.reflection(forPropID: propID) {
                     SpecimenJournalView(reflection: reflection)
                 }
+            case .settings:
+                SettingsView(viewModel: container.makeSettingsViewModel())
             }
         }
     }

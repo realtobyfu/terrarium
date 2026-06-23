@@ -28,6 +28,8 @@ struct CompactDestinationRow: View {
     let description: String?
     let openText: String
     let walkText: String?
+    /// SF Symbol for the travel pill, matching the user's transport mode.
+    var travelGlyph: String = "figure.walk"
 
     private let artWidth: CGFloat = 112
     private let notchRadius: CGFloat = 9
@@ -69,7 +71,7 @@ struct CompactDestinationRow: View {
                 HStack(spacing: 8) {
                     OrganicPill(systemImage: "leaf.fill", text: openText, tint: Theme.Garden.moss)
                     if let walkText {
-                        OrganicPill(systemImage: "figure.walk", text: walkText, tint: Theme.Garden.bloom)
+                        OrganicPill(systemImage: travelGlyph, text: walkText, tint: Theme.Garden.bloom)
                     }
                 }
                 .padding(.top, 1)
@@ -104,6 +106,8 @@ struct TicketDestinationCard: View {
     let description: String?
     let openText: String
     let walkText: String?
+    /// Caption for the travel field, matching the user's transport mode.
+    var travelCaption: String = "ON FOOT"
 
     private let corner: CGFloat = Theme.Radius.hero
     private let notchRadius: CGFloat = 11
@@ -177,7 +181,7 @@ struct TicketDestinationCard: View {
             ticketField(caption: "STATUS", value: openText)
             Spacer(minLength: 0)
             if let walkText {
-                ticketField(caption: "ON FOOT", value: walkText)
+                ticketField(caption: travelCaption, value: walkText)
             }
         }
         .padding(.horizontal, Theme.Spacing.l)
@@ -398,7 +402,8 @@ private struct TicketCardPreview: View {
                     eyebrow: "\(poi.category.label) · \(poi.neighborhood)",
                     description: vm.vibeLine,
                     openText: vm.pickIsLikelyOpen ? "Open Now" : "Hours vary",
-                    walkText: vm.walkInfo.map { "\($0.walkMinutes) min" }
+                    walkText: vm.travelInfo.map { "\($0.minutes) min" },
+                    travelCaption: (vm.travelInfo?.mode ?? .walk).ticketCaption
                 )
                 .padding()
             }
@@ -423,7 +428,8 @@ private struct CompactRowPreview: View {
                     eyebrow: "\(poi.category.label) · \(poi.neighborhood)",
                     description: vm.vibeLine,
                     openText: vm.pickIsLikelyOpen ? "Open Now" : "Hours vary",
-                    walkText: vm.walkInfo.map { "\($0.walkMinutes) min" }
+                    walkText: vm.travelInfo.map { "\($0.minutes) min" },
+                    travelGlyph: (vm.travelInfo?.mode ?? .walk).systemImage
                 )
                 .padding()
             }
