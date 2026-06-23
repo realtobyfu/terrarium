@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One run per branch; newer pushes cancel older in-flight runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-test:
+    name: Build, test & capture
+    runs-on: macos-26
+    env:
+      SCHEME: Terrarium
+      PROJECT: Terrarium.xcodeproj
+      DERIVED: DerivedData
+      BUNDLE_ID: com.tobiasfu.Terrarium
+      RESULT_BUNDLE: ${{ github.workspace }}/Test.xcresult
+      SCREENS_DIR: ${{ github.workspace }}/artifacts/screens
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [ -n "$APP" ]; then sudo xcode-select -s "$APP"; fi
+          xcodebuild -version
+
+      - name: Select simulator
+        id: sim
+        run: python3 .github/scripts/pick-simulator.py
+
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath "$DERIVED" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run tests
+        run: |
+          set +e
+          xcodebuild test-without-building \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath "$DERIVED" \
+            -resultBundlePath "$RESULT_BUNDLE" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee test.log
+          echo "TEST_RESULT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Capture screenshots & recording
+        if: ${{ !cancelled() }}
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+          APP_PATH: ${{ github.workspace }}/DerivedData/Build/Products/Debug-iphonesimulator/Terrarium.app
+          OUT_DIR: ${{ github.workspace }}/artifacts/screens
+        run: bash .github/scripts/capture-screens.sh
+
+      - name: Upload artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-artifacts
+          path: |
+            artifacts/screens
+            Test.xcresult
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Job summary
+        if: ${{ !cancelled() }}
+        run: |
+          if [ "${TEST_RESULT:-1}" = "0" ]; then STATUS="✅ Passed"; else STATUS="❌ Failed"; fi
+          {
+            echo "## 🌱 Terrarium CI"
+            echo ""
+            echo "**Build & test:** $STATUS"
+            echo ""
+            echo "**Simulator:** ${{ steps.sim.outputs.name }} · iOS ${{ steps.sim.outputs.runtime }}"
+            echo ""
+            echo "Screenshots, recording, and the .xcresult are attached as the **ci-artifacts** artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sticky PR comment
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SIM_NAME: ${{ steps.sim.outputs.name }}
+          SIM_RUNTIME: ${{ steps.sim.outputs.runtime }}
+        run: python3 .github/scripts/pr-comment.py
+
+      - name: Report test status
+        if: ${{ !cancelled() }}
+        run: |
+          echo "Test exit code: ${TEST_RESULT:-1}"
+          exit "${TEST_RESULT:-1}"
