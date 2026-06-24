@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write      # push captured screenshots to the ci-screens branch
   pull-requests: write
 
 jobs:
@@ -26,7 +26,11 @@ jobs:
       DERIVED: DerivedData
       BUNDLE_ID: com.tobiasfu.Terrarium
       RESULT_BUNDLE: ${{ github.workspace }}/Test.xcresult
+      UITEST_RESULT: ${{ github.workspace }}/UITest.xcresult
       SCREENS_DIR: ${{ github.workspace }}/artifacts/screens
+      FEATURE_DIR: ${{ github.workspace }}/artifacts/feature-screens
+      SCREENS_BRANCH: ci-screens
+      UITEST_ID: TerrariumUITests/FeatureScreenshotTests/testCaptureFeatureScreens
 
     steps:
       - uses: actions/checkout@v4
@@ -50,6 +54,7 @@ jobs:
             -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath "$DERIVED" \
             -only-testing:TerrariumTests \
+            -only-testing:"$UITEST_ID" \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Run tests
@@ -75,8 +80,40 @@ jobs:
         env:
           UDID: ${{ steps.sim.outputs.udid }}
           APP_PATH: ${{ github.workspace }}/DerivedData/Build/Products/Debug-iphonesimulator/Terrarium.app
-          OUT_DIR: ${{ github.workspace }}/artifacts/screens
+          OUT_DIR: ${{ env.SCREENS_DIR }}
         run: bash .github/scripts/capture-screens.sh
+
+      # Drive the app to the specific feature screens (transport onboarding step
+      # + Settings sheet) and pull the named screenshots out of the .xcresult.
+      # Best-effort: this never fails the build (the UI test is outside the gated
+      # -only-testing:TerrariumTests scope).
+      - name: Capture feature screens (UI test)
+        if: ${{ !cancelled() }}
+        run: |
+          set +e
+          xcodebuild test-without-building \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath "$DERIVED" \
+            -resultBundlePath "$UITEST_RESULT" \
+            -only-testing:"$UITEST_ID" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee uitest.log
+          XCRESULT="$UITEST_RESULT" OUT_DIR="$FEATURE_DIR" \
+            python3 .github/scripts/extract-attachments.py
+          exit 0
+
+      # Publish the feature screenshots to the ci-screens orphan branch so they
+      # render inline in the PR comment. Skipped for fork PRs (read-only token).
+      - name: Publish feature screens
+        id: screens
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/publish-screens.sh
 
       - name: Upload artifacts
         if: ${{ !cancelled() }}
@@ -85,7 +122,9 @@ jobs:
           name: ci-artifacts
           path: |
             artifacts/screens
+            artifacts/feature-screens
             Test.xcresult
+            UITest.xcresult
           if-no-files-found: warn
           retention-days: 14
 
@@ -112,6 +151,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SIM_NAME: ${{ steps.sim.outputs.name }}
           SIM_RUNTIME: ${{ steps.sim.outputs.runtime }}
+          SCREENS_SHA: ${{ steps.screens.outputs.screens_sha }}
         run: python3 .github/scripts/pr-comment.py
 
       - name: Report test status

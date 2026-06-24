@@ -145,10 +145,13 @@ struct OnboardingFlowView: View {
                             isSelected: viewModel.selectedTransportMode == mode,
                             action: { viewModel.selectTransportMode(mode) }
                         )
+                        .accessibilityIdentifier("onboarding.transport.\(mode.rawValue)")
                     }
                 }
             }
         }
+        // UI-test anchor: lets CI confirm it reached the transport step.
+        .accessibilityIdentifier("onboarding.transportStep")
         .transition(Self.stepTransition)
     }
 
@@ -183,6 +186,7 @@ struct OnboardingFlowView: View {
                     .foregroundStyle(Theme.Palette.secondary)
                     .padding(.horizontal, Theme.Spacing.s)
                     .frame(minHeight: 44)
+                    .accessibilityIdentifier("onboarding.skip")
             }
         }
         .padding(.horizontal, Theme.Spacing.l)
@@ -224,6 +228,7 @@ struct OnboardingFlowView: View {
                 .buttonStyle(.glassProminent)
                 .tint(Theme.Garden.moss)
                 .controlSize(.large)
+                .accessibilityIdentifier("onboarding.continue")
             }
         }
         .padding(.horizontal, Theme.Spacing.l)

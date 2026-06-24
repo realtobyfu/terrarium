@@ -47,6 +47,7 @@ struct HomeView: View {
                     GlassIconButton(systemImage: "gearshape.fill",
                                     accessibilityLabel: "Settings",
                                     action: { viewModel.openSettings() })
+                        .accessibilityIdentifier("home.settingsButton")
                 }
             )
             .padding(.horizontal, Theme.Spacing.l)
