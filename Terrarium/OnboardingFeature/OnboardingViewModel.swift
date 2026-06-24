@@ -49,7 +49,9 @@ final class OnboardingViewModel {
 
     /// Selected persona. Pre-selecting in `selectPersona(_:)` also updates radius.
     private(set) var selectedPersona: PersonaKind = .restlessLocal
-    var selectedCategories: Set<POICategory> = []
+    /// Default to all user-facing categories selected (the InterestTags step shows
+    /// every `POICategory` except `.other`), so the user opts out rather than in.
+    var selectedCategories: Set<POICategory> = Set(POICategory.allCases.filter { $0 != .other })
     var selectedVibes: Set<Vibe> = []
     var travelRadiusMeters: Double = 2000
 
