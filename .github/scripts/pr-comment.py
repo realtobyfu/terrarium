@@ -7,7 +7,8 @@ with build/test status, simulator info, and a link to the run's artifacts
 comment tagged with MARKER.
 
 Env: REPO, PR_NUMBER, RUN_URL, TEST_RESULT, RESULT_BUNDLE, SIM_NAME,
-     SIM_RUNTIME, SCREENS_DIR, GH_TOKEN (consumed by gh).
+     SIM_RUNTIME, SCREENS_DIR, FEATURE_DIR, SCREENS_BRANCH, SCREENS_SHA,
+     GH_TOKEN (consumed by gh).
 """
 
 import json
@@ -76,22 +77,60 @@ def build_body() -> str:
     sim_rt = env("SIM_RUNTIME", "?")
     lines += [f"**Simulator:** {sim_name} · iOS {sim_rt}", ""]
 
+    lines += feature_screens_section()
+    lines += artifacts_section()
+
+    lines += [f"[View full run →]({env('RUN_URL')})"]
+    return "\n".join(lines)
+
+
+def feature_screens_section() -> list[str]:
+    """Render the captured feature screenshots inline via raw.githubusercontent
+    URLs (pushed to a dedicated branch by publish-screens.sh). Falls back to a
+    plain filename list if the publish step didn't produce a commit SHA."""
+    feature_dir = env("FEATURE_DIR")
+    if not feature_dir or not os.path.isdir(feature_dir):
+        return []
+    pngs = sorted(f for f in os.listdir(feature_dir) if f.lower().endswith(".png"))
+    if not pngs:
+        return []
+
+    lines = ["**📸 Feature screens**", ""]
+
+    repo = env("REPO")
+    sha = env("SCREENS_SHA")
+    pr = env("PR_NUMBER")
+    if repo and sha and pr:
+        base = f"https://raw.githubusercontent.com/{repo}/{sha}/pr-{pr}"
+        # A simple table keeps the images side-by-side and reasonably sized.
+        titles = [os.path.splitext(p)[0] for p in pngs]
+        lines.append("| " + " | ".join(titles) + " |")
+        lines.append("|" + "|".join([":---:"] * len(pngs)) + "|")
+        cells = [f'<img src="{base}/{p}" width="240">' for p in pngs]
+        lines.append("| " + " | ".join(cells) + " |")
+    else:
+        # Publish step unavailable (e.g. fork PR): list names, link artifacts.
+        lines += [f"- `{p}`" for p in pngs]
+    lines.append("")
+    return lines
+
+
+def artifacts_section() -> list[str]:
+    """Point at the run's artifacts for the full set (raw frames + recording)."""
     screens_dir = env("SCREENS_DIR")
     shots = []
     if screens_dir and os.path.isdir(screens_dir):
         shots = sorted(f for f in os.listdir(screens_dir)
                        if f.lower().endswith((".png", ".mov")))
-    if shots:
-        lines += [
-            "**📸 Screenshots & recording** — download from the run's "
-            f"[**Artifacts**]({env('RUN_URL')}#artifacts):",
-            "",
-        ]
-        lines += [f"- `{s}`" for s in shots]
-        lines.append("")
-
-    lines += [f"[View full run →]({env('RUN_URL')})"]
-    return "\n".join(lines)
+    if not shots:
+        return []
+    return [
+        "**🎞 Recording & raw frames** — download from the run's "
+        f"[**Artifacts**]({env('RUN_URL')}#artifacts):",
+        "",
+        *[f"- `{s}`" for s in shots],
+        "",
+    ]
 
 
 def gh(*args: str) -> str:

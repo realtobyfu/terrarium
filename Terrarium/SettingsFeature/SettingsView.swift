@@ -19,12 +19,17 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
                     transportSection
+                        .accessibilityIdentifier("settings.transportSection")
                     interestsSection
+                        .accessibilityIdentifier("settings.interestsSection")
                     vibesSection
+                        .accessibilityIdentifier("settings.vibesSection")
                     radiusSection
+                        .accessibilityIdentifier("settings.radiusSection")
                 }
                 .padding(.horizontal, Theme.Spacing.l)
                 .padding(.vertical, Theme.Spacing.l)
+                .accessibilityIdentifier("settings.root")
             }
             .scrollIndicators(.hidden)
             .background(Color(hex: "FBF2E0").ignoresSafeArea())
