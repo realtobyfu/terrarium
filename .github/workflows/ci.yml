@@ -91,6 +91,8 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set +e
+          # Cap a single test so a hang returns control here (and we still
+          # exit 0) instead of spinning for the whole job timeout.
           xcodebuild test-without-building \
             -project "$PROJECT" \
             -scheme "$SCHEME" \
@@ -99,6 +101,8 @@ jobs:
             -derivedDataPath "$DERIVED" \
             -resultBundlePath "$UITEST_RESULT" \
             -only-testing:"$UITEST_ID" \
+            -test-timeouts-enabled YES \
+            -maximum-test-execution-time-allowance 240 \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee uitest.log
           XCRESULT="$UITEST_RESULT" OUT_DIR="$FEATURE_DIR" \
             python3 .github/scripts/extract-attachments.py

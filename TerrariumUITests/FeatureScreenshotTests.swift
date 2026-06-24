@@ -21,8 +21,10 @@ import XCTest
 
 final class FeatureScreenshotTests: XCTestCase {
 
-    /// Generous timeout — hosted simulators are slow to settle on first launch.
-    private let timeout: TimeInterval = 30
+    /// Generous timeout — hosted simulators are slow to settle on first launch,
+    /// but bounded so a genuine miss fails in seconds rather than spinning the
+    /// accessibility query for minutes.
+    private let timeout: TimeInterval = 20
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -34,6 +36,9 @@ final class FeatureScreenshotTests: XCTestCase {
         // Force onboarding regardless of any persisted state (argument domain
         // wins over the standard domain for `defaults.bool(forKey:)`).
         app.launchArguments += ["-terrarium.onboardingCompleted.v1", "NO"]
+        // Suppress the RealityKit globe on Home — on a GPU-less CI simulator it
+        // hangs the accessibility snapshot, so the Settings gear is unreachable.
+        app.launchArguments += ["UITEST_DISABLE_GLOBE"]
         app.launch()
 
         let continueButton = app.buttons["onboarding.continue"]

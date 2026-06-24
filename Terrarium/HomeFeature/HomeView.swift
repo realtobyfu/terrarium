@@ -20,10 +20,17 @@ struct HomeView: View {
             // 2. World (3D globe). Keyed on a world signature so it rebuilds when
             // the garden grows (new props) or lushens (vitality), since WorldView
             // only builds its entities once.
-            WorldView(world: viewModel.world, sky: viewModel.sky,
-                      onTapSpecimen: { viewModel.openSpecimen(propID: $0) })
-                .id(viewModel.globeSignature)
-                .ignoresSafeArea()
+            //
+            // Skipped under UI testing: RealityKit on a GPU-less CI simulator can
+            // hang the accessibility snapshot (and the whole app), which made the
+            // screenshot UI test time out. The sky layer behind keeps the frame
+            // looking right without the 3D scene.
+            if !Self.isUITesting {
+                WorldView(world: viewModel.world, sky: viewModel.sky,
+                          onTapSpecimen: { viewModel.openSpecimen(propID: $0) })
+                    .id(viewModel.globeSignature)
+                    .ignoresSafeArea()
+            }
 
             // 3. Bottom reward surface (garden progress).
             VStack {
@@ -72,6 +79,11 @@ struct HomeView: View {
             }
         }
     }
+
+    /// True when launched by the screenshot UI test, which passes this flag to
+    /// suppress the RealityKit globe (see comment at the WorldView site).
+    private static let isUITesting =
+        ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_GLOBE")
 }
 
 // MARK: - Weather display (file-scoped, mirrors the Explore top bars)
